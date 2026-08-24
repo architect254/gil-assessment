@@ -9,6 +9,7 @@ use App\Filament\Resources\Items\Schemas\ItemForm;
 use App\Filament\Resources\Items\Tables\ItemsTable;
 use App\Models\Item;
 use BackedEnum;
+use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -22,7 +23,9 @@ class ItemResource extends Resource
 
     protected static ?string $modelLabel = 'Item';
 
-    protected static ?int $navigationSort = 2;
+    protected static string|null|\UnitEnum $navigationGroup = 'Master Data';
+
+    protected static ?int $navigationSort = 11;
 
     public static function form(Schema $schema): Schema
     {

@@ -32,5 +32,24 @@ class GateSeeder extends Seeder
         foreach ($drivers as $driver) {
             Driver::query()->updateOrCreate(['name' => $driver['name']], $driver);
         }
+
+        $assignments = [
+            ['KAA 123A', 'Ali Hassan'],
+            ['KBB 456B', 'Brian Otieno'],
+            ['KCC 789C', 'Charles Mutua'],
+            ['KDD 012D', 'David Kiprotich'],
+        ];
+
+        foreach ($assignments as [$plate, $driverName]) {
+            $vehicle = Vehicle::query()->where('number', $plate)->first();
+            $driver = Driver::query()->where('name', $driverName)->first();
+
+            if ($vehicle && $driver) {
+                \App\Models\VehicleDriver::query()->updateOrCreate(
+                    ['vehicle_id' => $vehicle->id, 'driver_id' => $driver->id],
+                    ['active' => true],
+                );
+            }
+        }
     }
 }

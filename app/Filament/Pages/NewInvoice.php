@@ -8,6 +8,7 @@ use App\Models\InvoiceLine;
 use App\Models\Item;
 use App\Models\SalesEmployee;
 use BackedEnum;
+use UnitEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -33,9 +34,11 @@ class NewInvoice extends Page
 
     public ?array $data = [];
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-plus';
 
-    protected static ?int $navigationSort = -1;
+    protected static UnitEnum|string|null $navigationGroup = 'Sales – AR';
+
+    protected static ?int $navigationSort = 10;
 
     public static function getNavigationLabel(): string
     {

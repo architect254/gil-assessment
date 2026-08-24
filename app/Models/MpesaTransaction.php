@@ -34,9 +34,6 @@ class MpesaTransaction extends Model
     {
         $callback = data_get($payload, 'Body.stkCallback', data_get($payload, 'Body'));
 
-        $item = data_get($callback, 'CallbackMetadata.items.0.Item')
-            ?? data_get($callback, 'CallbackMetadata.Item');
-
         if (is_array(data_get($callback, 'CallbackMetadata.items'))) {
             // STK push style: items is a list of {Name, Value}
             foreach (data_get($callback, 'CallbackMetadata.items', []) as $entry) {
@@ -52,6 +49,7 @@ class MpesaTransaction extends Model
                 data_get($payload, 'TransactionID')
                 ?? data_get($payload, 'TransID')
                 ?? data_get($callback, 'TransactionID')
+                ?? data_get($callback, 'fields.TransID')
             ),
             'trans_time' => $string(
                 data_get($payload, 'TransTime')
@@ -61,6 +59,7 @@ class MpesaTransaction extends Model
                 data_get($payload, 'TransAmount')
                 ?? data_get($callback, 'TransAmount')
                 ?? data_get($callback, 'fields.TransAmount')
+                ?? data_get($callback, 'fields.Amount')
             ),
             'business_short_code' => $string(
                 data_get($payload, 'BusinessShortCode')

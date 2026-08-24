@@ -9,6 +9,7 @@ use App\Filament\Resources\SalesEmployees\Schemas\SalesEmployeeForm;
 use App\Filament\Resources\SalesEmployees\Tables\SalesEmployeesTable;
 use App\Models\SalesEmployee;
 use BackedEnum;
+use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -22,7 +23,9 @@ class SalesEmployeeResource extends Resource
 
     protected static ?string $modelLabel = 'Sales Employee';
 
-    protected static ?int $navigationSort = 3;
+    protected static UnitEnum|string|null $navigationGroup = 'Master Data';
+
+    protected static ?int $navigationSort = 21;
 
     public static function form(Schema $schema): Schema
     {
