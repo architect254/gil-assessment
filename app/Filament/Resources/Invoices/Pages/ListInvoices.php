@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Invoices\Pages;
 
-use App\Filament\Pages\NewInvoice;
 use App\Filament\Resources\Invoices\InvoiceResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -15,7 +14,7 @@ class ListInvoices extends ListRecords
     {
         return [
             CreateAction::make()
-                ->url(fn (): string => NewInvoice::getUrl()),
+                ->url(fn (): string => static::getResource()::getUrl('create')),
         ];
     }
 }

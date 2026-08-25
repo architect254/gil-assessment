@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoices;
 
 use App\Filament\Resources\Invoices\Pages\ListInvoices;
+use App\Filament\Resources\Invoices\Pages\NewInvoice;
 use App\Filament\Resources\Invoices\Pages\ViewInvoice;
 use App\Filament\Resources\Invoices\Schemas\InvoiceInfolist;
 use App\Filament\Resources\Invoices\Tables\InvoicesTable;
@@ -63,6 +64,7 @@ class InvoiceResource extends Resource
     {
         return [
             'index' => ListInvoices::route('/'),
+            'create' => NewInvoice::route('/create'),
             'view' => ViewInvoice::route('/{record}'),
         ];
     }

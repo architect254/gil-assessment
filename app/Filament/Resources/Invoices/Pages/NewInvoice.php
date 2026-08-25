@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Resources\Invoices\Pages;
 
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -8,7 +8,6 @@ use App\Models\InvoiceLine;
 use App\Models\Item;
 use App\Models\SalesEmployee;
 use App\Services\InvoiceCalculator;
-use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -18,7 +17,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Filament\Pages\Page;
+use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form as FormComponent;
@@ -26,31 +25,14 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
-use UnitEnum;
 
 class NewInvoice extends Page
 {
+    protected static string $resource = \App\Filament\Resources\Invoices\InvoiceResource::class;
+
     protected string $view = 'filament.pages.new-invoice';
 
     public ?array $data = [];
-
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-plus';
-
-    protected static UnitEnum|string|null $navigationGroup = 'Sales – AR';
-
-    protected static ?int $navigationSort = 10;
-
-    protected static bool $shouldRegisterNavigation = false;
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'New Invoice';
-    }
 
     public function getTitle(): string
     {
@@ -103,7 +85,7 @@ class NewInvoice extends Page
             ->success()
             ->send();
 
-        $this->redirect(static::getUrl(), navigate: true);
+        $this->redirect(static::getResource()::getUrl('index'), navigate: true);
     }
 
     /**
@@ -226,10 +208,6 @@ class NewInvoice extends Page
         data_set($livewire, 'data.customer_name', $customer->name);
     }
 
-    /**
-     * The list shows the customer name in the first column when
-     * `$codeFirst` is false, otherwise the code comes first.
-     */
     protected function customerPickerSelect(bool $codeFirst): Select
     {
         return Select::make('customer_id')
@@ -392,10 +370,6 @@ class NewInvoice extends Page
         data_set($livewire, "{$fieldPath}.price_before_discount", sprintf('%.3F', (float) $item->unit_price));
     }
 
-    /**
-     * The list shows the item description in the first column when
-     * `$descriptionFirst` is true, otherwise the item no. comes first.
-     */
     protected function itemPickerSelect(bool $descriptionFirst): Select
     {
         return Select::make('item_id')

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Pages\NewInvoice;
+use App\Filament\Resources\Invoices\Pages\NewInvoice;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Item;
@@ -19,7 +19,7 @@ class InvoiceTest extends TestCase
 
     public function test_new_invoice_page_requires_authentication(): void
     {
-        $this->get('/admin/new-invoice')->assertRedirect();
+        $this->get('/admin/invoices/create')->assertRedirect();
     }
 
     public function test_authenticated_user_can_access_new_invoice_page(): void
@@ -27,7 +27,7 @@ class InvoiceTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get('/admin/new-invoice')
+            ->get('/admin/invoices/create')
             ->assertOk();
     }
 
@@ -161,9 +161,13 @@ class InvoiceTest extends TestCase
         $this->assertSame(2, $inv2->no);
     }
 
-    public function test_new_invoice_option_is_not_registered_in_navigation(): void
+    public function test_new_invoice_page_is_not_registered_in_navigation(): void
     {
-        $this->assertFalse(NewInvoice::shouldRegisterNavigation());
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(\App\Filament\Resources\Invoices\Pages\ListInvoices::class)
+            ->assertDontSeeNavigationItemLabel('New Invoice');
     }
 
     public function test_invoices_list_page_has_create_header_action_linking_to_new_invoice(): void

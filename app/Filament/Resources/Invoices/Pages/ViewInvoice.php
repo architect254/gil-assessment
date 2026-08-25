@@ -10,6 +10,11 @@ class ViewInvoice extends ViewRecord
 {
     protected static string $resource = InvoiceResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Invoice '.($this->record->no ?? '');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

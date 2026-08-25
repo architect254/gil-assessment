@@ -22,10 +22,10 @@ class CustomersTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('phone')
-                    ->searchable(),
+                    ->sortable(),
                 TextColumn::make('email')
                     ->searchable()
-                    ->toggleable(),
+                    ->sortable(),
             ])
             ->filters([
                 //
