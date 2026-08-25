@@ -12,6 +12,13 @@ class LoginActivity extends Model
 {
     use HasFactory;
 
+    protected function casts(): array
+    {
+        return [
+            'logged_in_at' => 'datetime',
+        ];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

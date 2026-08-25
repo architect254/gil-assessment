@@ -9,11 +9,11 @@ use App\Filament\Resources\SalesEmployees\Schemas\SalesEmployeeForm;
 use App\Filament\Resources\SalesEmployees\Tables\SalesEmployeesTable;
 use App\Models\SalesEmployee;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class SalesEmployeeResource extends Resource
 {

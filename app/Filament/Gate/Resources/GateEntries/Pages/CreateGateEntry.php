@@ -5,6 +5,7 @@ namespace App\Filament\Gate\Resources\GateEntries\Pages;
 use App\Filament\Gate\Resources\GateEntries\GateEntryResource;
 use App\Models\GateLog;
 use App\Models\Vehicle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,7 @@ class CreateGateEntry extends CreateRecord
 
             $this->redirect(static::$resource::getUrl('index'));
 
-            return new GateLog();
+            return new GateLog;
         }
 
         return GateLog::create([
@@ -52,7 +53,7 @@ class CreateGateEntry extends CreateRecord
 
     protected function notifyDanger(string $message): void
     {
-        \Filament\Notifications\Notification::make()
+        Notification::make()
             ->title($message)
             ->danger()
             ->send();

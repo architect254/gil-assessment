@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Invoices\Schemas;
 
+use App\Models\Invoice;
+use App\Services\MpesaService;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
@@ -16,7 +18,7 @@ class InvoiceInfolist
     {
         return $schema
             ->components([
-                Section::make('Invoice ' . ($schema->getRecord()?->no ?? ''))
+                Section::make('Invoice '.($schema->getRecord()?->no ?? ''))
                     ->columns(4)
                     ->schema([
                         TextEntry::make('no')
@@ -85,6 +87,32 @@ class InvoiceInfolist
                                     ->numeric(decimalPlaces: 3)
                                     ->weight('bold')
                                     ->alignEnd(),
+                            ]),
+                    ]),
+                Section::make('M-Pesa Payments')
+                    ->columnSpanFull()
+                    ->schema([
+                        RepeatableEntry::make('mpesa_transactions')
+                            ->hiddenLabel()
+                            ->state(fn (?Invoice $record) => $record ? app(MpesaService::class)->getTransactionsForInvoice($record) : [])
+                            ->placeholder('No M-Pesa transactions recorded for this invoice.')
+                            ->schema([
+                                TextEntry::make('transaction_id')->label('Trans ID')->badge()->color('primary'),
+                                TextEntry::make('trans_amount')->label('Amount')->numeric(decimalPlaces: 3),
+                                TextEntry::make('msisdn')->label('Phone'),
+                                TextEntry::make('first_name')->label('Payer')
+                                    ->formatStateUsing(fn ($record) => trim("{$record->first_name} {$record->last_name}") ?: '—'),
+                                TextEntry::make('bill_ref_number')->label('Reference'),
+                                TextEntry::make('trans_time')->label('Trans Time')
+                                    ->formatStateUsing(fn (?string $state) => $state ? date('Y-m-d H:i:s', strtotime($state) ?: time()) : '—'),
+                            ])
+                            ->table([
+                                TableColumn::make('Trans ID'),
+                                TableColumn::make('Amount')->alignEnd(),
+                                TableColumn::make('Phone'),
+                                TableColumn::make('Payer'),
+                                TableColumn::make('Reference'),
+                                TableColumn::make('Trans Time'),
                             ]),
                     ]),
             ]);

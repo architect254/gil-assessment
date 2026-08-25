@@ -116,4 +116,40 @@ class MpesaCallbackTest extends TestCase
 
         $this->assertSame(1, MpesaTransaction::count());
     }
+
+    public function test_duplicate_callback_is_idempotent(): void
+    {
+        $payload = $this->payload('DUP12345');
+
+        // First callback
+        $res1 = $this->postJson('/api/mpesa/confirmation', $payload);
+        $res1->assertOk()->assertJsonPath('ResultCode', 0);
+        $this->assertSame(1, MpesaTransaction::query()->where('transaction_id', 'DUP12345')->count());
+
+        // Second duplicate callback
+        $payload['TransAmount'] = '2000.00';
+        $res2 = $this->postJson('/api/mpesa/confirmation', $payload);
+        $res2->assertOk()->assertJsonPath('ResultCode', 0);
+
+        // Count must still be 1, amount updated
+        $this->assertSame(1, MpesaTransaction::query()->where('transaction_id', 'DUP12345')->count());
+        $this->assertSame('2000.00', MpesaTransaction::query()->where('transaction_id', 'DUP12345')->value('trans_amount'));
+    }
+
+    public function test_malformed_payload_is_defensively_handled_and_persisted(): void
+    {
+        $malformed = [
+            'UnexpectedKey' => 12345,
+            'CorruptedData' => ['nested' => true],
+        ];
+
+        $response = $this->postJson('/api/mpesa/confirmation', $malformed);
+
+        $response->assertOk()
+            ->assertJsonPath('ResultCode', 0)
+            ->assertJsonPath('ResultDesc', 'Accepted');
+
+        $this->assertSame(1, MpesaTransaction::count());
+        $this->assertNotNull(MpesaTransaction::first()->raw_payload);
+    }
 }

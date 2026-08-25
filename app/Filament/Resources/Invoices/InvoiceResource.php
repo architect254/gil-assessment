@@ -9,6 +9,7 @@ use App\Filament\Resources\Invoices\Tables\InvoicesTable;
 use App\Models\Invoice;
 use BackedEnum;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use UnitEnum;
@@ -25,10 +26,6 @@ class InvoiceResource extends Resource
 
     protected static ?int $navigationSort = 11;
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
 
     public static function canEdit($record): bool
     {
@@ -45,7 +42,7 @@ class InvoiceResource extends Resource
         return false;
     }
 
-    public static function infolist(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
+    public static function infolist(Schema $schema): Schema
     {
         return InvoiceInfolist::configure($schema);
     }

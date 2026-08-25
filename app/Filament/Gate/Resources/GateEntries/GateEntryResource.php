@@ -9,9 +9,9 @@ use App\Filament\Gate\Resources\GateEntries\Tables\GateEntriesTable;
 use App\Models\GateLog;
 use BackedEnum;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use UnitEnum;
 
 class GateEntryResource extends Resource
 {
@@ -21,7 +21,7 @@ class GateEntryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowRightStartOnRectangle;
 
-    public static function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
+    public static function form(Schema $schema): Schema
     {
         return GateEntryForm::configure($schema);
     }

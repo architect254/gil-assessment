@@ -6,11 +6,11 @@ use App\Filament\Gate\Resources\Vehicles\Pages\ListVehicles;
 use App\Filament\Gate\Resources\Vehicles\Tables\VehiclesTable;
 use App\Models\Vehicle;
 use BackedEnum;
-use Filament\Resources\Resource;
-use Filament\Support\Icons\Heroicon;
-use Filament\Schemas\Schema;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 class VehicleResource extends Resource

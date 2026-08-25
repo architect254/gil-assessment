@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MpesaTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class MpesaCallbackController extends Controller
 {
@@ -34,7 +35,7 @@ class MpesaCallbackController extends Controller
                 'amount' => $transaction->trans_amount,
                 'bill_ref_number' => $transaction->bill_ref_number,
                 'msisdn' => $transaction->msisdn,
-                'customer' => trim(($transaction->first_name ?? '') . ' ' . ($transaction->last_name ?? '')),
+                'customer' => trim(($transaction->first_name ?? '').' '.($transaction->last_name ?? '')),
                 'trans_time' => $transaction->trans_time,
                 'received_at' => $transaction->created_at?->toIso8601String(),
             ],
@@ -54,16 +55,30 @@ class MpesaCallbackController extends Controller
 
         $payload = $request->all();
 
-        // Idempotent upsert – M-Pesa may retry callbacks.
-        $transaction = MpesaTransaction::fromCallback($payload);
+        try {
+            // Idempotent upsert – M-Pesa may retry callbacks.
+            $transaction = MpesaTransaction::fromCallback($payload);
 
-        if (filled($transaction->transaction_id)) {
-            MpesaTransaction::query()->updateOrCreate(
-                ['transaction_id' => $transaction->transaction_id],
-                $transaction->getAttributes(),
-            );
-        } else {
-            $transaction->save();
+            if (filled($transaction->transaction_id)) {
+                MpesaTransaction::query()->updateOrCreate(
+                    ['transaction_id' => $transaction->transaction_id],
+                    $transaction->getAttributes(),
+                );
+            } else {
+                $transaction->save();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('M-Pesa callback handling fallback: '.$e->getMessage(), [
+                'payload' => $payload,
+            ]);
+
+            try {
+                MpesaTransaction::query()->create([
+                    'raw_payload' => json_encode($payload),
+                ]);
+            } catch (\Throwable $inner) {
+                Log::error('M-Pesa raw payload persistence failed: '.$inner->getMessage());
+            }
         }
 
         return response()->json([

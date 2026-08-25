@@ -2,14 +2,12 @@
 
 namespace App\Filament\Gate\Resources\VehicleDrivers\Tables;
 
-use App\Filament\Gate\Support\SortRecordsAction;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class VehicleDriversTable
@@ -18,42 +16,35 @@ class VehicleDriversTable
     {
         return $table
             ->columns([
-                Split::make([
-                    Stack::make([
-                        TextColumn::make('vehicle.number')
-                            ->label('Registration No.')
-                            ->searchable()
-                            ->sortable()
-                            ->weight(FontWeight::Bold),
-                        TextColumn::make('vehicle.description')
-                            ->label('Vehicle Description')
-                            ->placeholder('—'),
-                    ]),
-                    Stack::make([
-                        TextColumn::make('driver.name')
-                            ->label('Driver')
-                            ->searchable()
-                            ->sortable(),
-                        TextColumn::make('driver.phone')
-                            ->label('Phone')
-                            ->placeholder('—'),
-                    ]),
-                    IconColumn::make('active')
-                        ->boolean(),
-                ])->from('md')->grow(false),
+                TextColumn::make('vehicle.number')
+                    ->label('Registration No.')
+                    ->weight(FontWeight::Bold)
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('vehicle.description')
+                    ->label('Vehicle Description')
+                    ->placeholder('—'),
+                TextColumn::make('driver.name')
+                    ->label('Driver Name')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('driver.phone')
+                    ->label('Driver Phone')
+                    ->placeholder('—'),
+                IconColumn::make('active')
+                    ->label('Active Assignment')
+                    ->boolean(),
             ])
+            ->stackedOnMobile()
             ->filters([
-                //
+                TernaryFilter::make('active')
+                    ->label('Active Status'),
             ])
             ->recordActions([
                 EditAction::make(),
             ])
             ->toolbarActions([
                 CreateAction::make(),
-                SortRecordsAction::make([
-                    'vehicle.number' => 'Registration No.',
-                    'driver.name' => 'Driver',
-                ]),
             ])
             ->defaultSort('vehicle_id');
     }

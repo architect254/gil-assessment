@@ -9,11 +9,11 @@ use App\Filament\Resources\Items\Schemas\ItemForm;
 use App\Filament\Resources\Items\Tables\ItemsTable;
 use App\Models\Item;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class ItemResource extends Resource
 {
@@ -23,7 +23,7 @@ class ItemResource extends Resource
 
     protected static ?string $modelLabel = 'Item';
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Master Data';
+    protected static string|null|UnitEnum $navigationGroup = 'Master Data';
 
     protected static ?int $navigationSort = 11;
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'no',
@@ -63,5 +64,46 @@ class Invoice extends Model
     public static function nextNumber(): int
     {
         return (int) (static::query()->max('no') ?? 0) + 1;
+    }
+
+    /**
+     * Create an invoice with sequential numbering and retry protection on concurrency collisions.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<int, array<string, mixed>>  $lines
+     */
+    public static function createWithNextNumber(array $attributes, array $lines = [], int $maxRetries = 3): self
+    {
+        $attempts = 0;
+        while (true) {
+            $attempts++;
+            try {
+                return DB::transaction(function () use ($attributes, $lines): Invoice {
+                    $attributes['no'] = static::nextNumber();
+                    $invoice = static::query()->create($attributes);
+                    if (! empty($lines)) {
+                        $invoice->lines()->createMany($lines);
+                    }
+
+                    return $invoice;
+                });
+            } catch (\Throwable $e) {
+                $msg = $e->getMessage();
+                $isUniqueViolation = str_contains($msg, 'UNIQUE') ||
+                    str_contains($msg, 'Unique') ||
+                    str_contains($msg, 'unique') ||
+                    str_contains($msg, '23000') ||
+                    str_contains($msg, '2627') ||
+                    str_contains($msg, '2601');
+
+                if ($attempts < $maxRetries && $isUniqueViolation) {
+                    usleep(random_int(5000, 25000));
+
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
     }
 }

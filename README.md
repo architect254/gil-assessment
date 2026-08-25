@@ -1,58 +1,185 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Enterprise ERP & Gate Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+An enterprise-grade Laravel application featuring an SAP Business One style Sales AR Invoice interface, a responsive Vehicle Gate Operations system with automated login audit logging, and a hardened Safaricom Daraja M-Pesa C2B REST API webhook integration.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Architecture & Module Summary
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Task 1: ERP Web Application (Sales AR Invoice)
+- **SAP Business One Layout**: Clean header, lines repeater, and financial summary footer.
+- **Customer & Item Pickers**:
+  - Type-ahead autocomplete suggestions on Customer Code and Customer Name.
+  - Modal "Choose From List" with code-first and name-first sorting.
+  - Item picker auto-populates description and unit price with 3-decimal precision.
+- **Financial Calculation Engine (`App\Services\InvoiceCalculator`)**:
+  - Pure domain service encapsulating line computations, discounts, and rounding.
+  - Strict 3-decimal precision without floating point drift.
+- **Conditional Approval Trigger**:
+  - Real-time dynamic banner: `"Invoice will go for approval – Amount: {getAmount}"`.
+  - Appears immediately when `Total After Discount > 10000.000`; hidden otherwise.
+- **Validations**:
+  - Line discount capped at 50% (`lte:50`).
+  - Remarks field is mandatory.
+- **Concurrency Hardening**:
+  - `Invoice::createWithNextNumber()` provides automatic retry protection against unique number collision under concurrent traffic.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Task 2: Vehicle Gate Operations
+- **Login Activity Auditing (`App\Listeners\RecordSuccessfulLogin`)**:
+  - Listens to `Illuminate\Auth\Events\Login` and logs `user_id`, `logged_in_at`, `ip_address`, and `user_agent` to `login_activities`.
+  - Configured with database session persistence (`SESSION_DRIVER=database`).
+- **Gate In Screen**:
+  - Searchable vehicle dropdown with active driver assignment auto-fill.
+  - Guards against double entry if vehicle is already on premises.
+- **Dedicated Gate Out Screen (`/gate/gate-out`)**:
+  - Vehicle dropdown **strictly** lists vehicles currently on premises (`status = 'in'`).
+  - Auto-populates Driver Name, ID / Passport Number, Phone Number, and Gate In timestamp as read-only fields.
+  - Captures `gated_out_at` timestamp and `gated_out_by` user ID.
+- **Unified Exit Domain Service (`App\Services\RegisterGateExit`)**:
+  - Single source of truth for exit transactions used by both the dedicated Gate Out screen and the list table row action.
+  - Implements row locking and double-exit protection.
 
-## Learning Laravel
+### Task 3: M-Pesa C2B REST API
+- **Webhook Endpoints**:
+  - `POST /api/mpesa/validation`
+  - `POST /api/mpesa/confirmation`
+  - `GET /api/mpesa/transactions/{transactionId}`
+- **Security & Reliability**:
+  - Rate limited at the route level (`throttle:60,1`).
+  - Optional shared secret verification via `X-Callback-Secret` header.
+  - Extracts all Daraja payload attributes into string fields.
+  - Idempotent upsert on `transaction_id` for duplicate callback tolerance.
+  - Defensive fallback logic: always returns `{ "ResultCode": 0, "ResultDesc": "Accepted" }` and preserves raw JSON payload.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Quick Start & Installation
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### 1. Prerequisites
+- PHP 8.3+
+- Composer
+- Node.js & NPM
+- SQLite or Microsoft SQL Server (2019 / 2022 / Azure SQL)
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
+### 2. Setup Commands
 ```bash
-composer require laravel/boost --dev
+# Clone and install dependencies
+composer install
+npm install && npm run build
 
-php artisan boost:install
+# Configure environment
+cp .env.example .env
+php artisan key:generate
+
+# Run database migrations and seeders
+php artisan migrate:fresh --seed
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 3. Default Test Credentials
+- **Admin Panel URL**: `http://127.0.0.1:8000/admin`
+- **Gate Operations URL**: `http://127.0.0.1:8000/gate`
+- **Email**: `admin@example.com`
+- **Password**: `password`
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Switching to Microsoft SQL Server (`sqlsrv`)
 
-## Code of Conduct
+The application database schema and domain services are fully SQL Server compatible.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+1. Ensure PHP extensions `pdo_sqlsrv` and `sqlsrv` are enabled.
+2. In your `.env` file, update the database configuration:
+```env
+DB_CONNECTION=sqlsrv
+DB_HOST=127.0.0.1
+DB_PORT=1433
+DB_DATABASE=erp_assessment
+DB_USERNAME=sa
+DB_PASSWORD=YourStrongPassword!
+DB_TRUST_SERVER_CERTIFICATE=true
+```
+3. Run migrations and seed data:
+```bash
+php artisan migrate:fresh --seed
+```
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Testing & Verification
 
-## License
+### Running Automated Test Suite
+```bash
+# Run all unit and feature tests
+php artisan test
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Run code style formatting checks
+vendor/bin/pint --test
+```
+
+### Test Coverage Highlights
+- `Tests\Unit\InvoiceCalculatorTest`: 3-decimal precision, discount boundary math, approval threshold boundaries (9,999.999 vs 10,000.000 vs 10,000.001).
+- `Tests\Feature\InvoiceTest`: Livewire form validation (discount > 50%, empty remarks), sequential document numbering, header and line persistence.
+- `Tests\Feature\LoginAuditTest`: Automated capture of login timestamp, IP address, and user agent on authentication.
+- `Tests\Feature\GateEntryTest`: Gate In registration and driver resolution.
+- `Tests\Feature\GateOutTest`: Dedicated Gate Out filtering, auto-population, and double-exit prevention.
+- `Tests\Feature\MpesaCallbackTest`: C2B validation and confirmation webhook handling, idempotency, secret authentication, and malformed payload resilience.
+
+---
+
+## M-Pesa C2B API Testing (cURL Examples)
+
+### 1. Validation Callback
+```bash
+curl -X POST http://127.0.0.1:8000/api/mpesa/validation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "TransactionType": "Pay Bill",
+    "TransID": "VAL98765XYZ",
+    "TransTime": "20260824183000",
+    "TransAmount": "2500.000",
+    "BusinessShortCode": "174379",
+    "BillRefNumber": "INV-1001",
+    "InvoiceNumber": "",
+    "OrgAccountBalance": "75000.000",
+    "ThirdPartyTransID": "",
+    "MSISDN": "254712345678",
+    "FirstName": "Jane",
+    "MiddleName": "",
+    "LastName": "Doe"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "ResultCode": 0,
+  "ResultDesc": "Accepted"
+}
+```
+
+### 2. Confirmation Callback (with Callback Secret)
+```bash
+curl -X POST http://127.0.0.1:8000/api/mpesa/confirmation \
+  -H "Content-Type: application/json" \
+  -H "X-Callback-Secret: your_configured_secret" \
+  -d '{
+    "TransactionType": "Pay Bill",
+    "TransID": "CNF12345ABC",
+    "TransTime": "20260824183000",
+    "TransAmount": "5000.000",
+    "BusinessShortCode": "174379",
+    "BillRefNumber": "INV-1002",
+    "InvoiceNumber": "",
+    "OrgAccountBalance": "80000.000",
+    "ThirdPartyTransID": "",
+    "MSISDN": "254798765432",
+    "FirstName": "John",
+    "MiddleName": "",
+    "LastName": "Kamau"
+  }'
+```
+
+### 3. Transaction Lookup Endpoint
+```bash
+curl -X GET http://127.0.0.1:8000/api/mpesa/transactions/CNF12345ABC
+```

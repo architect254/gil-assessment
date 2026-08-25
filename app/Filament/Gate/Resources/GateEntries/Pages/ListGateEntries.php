@@ -2,6 +2,7 @@
 
 namespace App\Filament\Gate\Resources\GateEntries\Pages;
 
+use App\Filament\Gate\Pages\GateOut;
 use App\Filament\Gate\Resources\GateEntries\GateEntryResource;
 use App\Models\GateLog;
 use Filament\Actions\Action;
@@ -22,6 +23,11 @@ class ListGateEntries extends ListRecords
                 ->label('Register Gate In')
                 ->icon('heroicon-o-arrow-left-end-on-rectangle')
                 ->url(static::$resource::getUrl('create')),
+            Action::make('gateOut')
+                ->label('Register Gate Out')
+                ->icon('heroicon-o-arrow-right-start-on-rectangle')
+                ->color('gray')
+                ->url(GateOut::getUrl()),
         ];
     }
 

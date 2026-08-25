@@ -2,12 +2,9 @@
 
 namespace App\Filament\Gate\Resources\Drivers\Tables;
 
-use App\Filament\Gate\Support\SortRecordsAction;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -17,25 +14,26 @@ class DriversTable
     {
         return $table
             ->columns([
-                Split::make([
-                    TextColumn::make('name')
-                        ->searchable()
-                        ->sortable()
-                        ->weight(FontWeight::Bold),
-                    Stack::make([
-                        TextColumn::make('id_number')
-                            ->label('ID / Passport No.')
-                            ->searchable()
-                            ->placeholder('—'),
-                        TextColumn::make('phone')
-                            ->label('Phone')
-                            ->placeholder('—'),
-                    ]),
-                    TextColumn::make('vehicles_count')
-                        ->counts('vehicles')
-                        ->label('Vehicles'),
-                ])->from('md')->grow(false),
+                TextColumn::make('name')
+                    ->label('Driver Name')
+                    ->searchable()
+                    ->sortable()
+                    ->weight(FontWeight::Bold),
+                TextColumn::make('id_number')
+                    ->label('ID / Passport No.')
+                    ->searchable()
+                    ->placeholder('—'),
+                TextColumn::make('phone')
+                    ->label('Phone')
+                    ->icon('heroicon-m-phone')
+                    ->searchable()
+                    ->placeholder('—'),
+                TextColumn::make('vehicles_count')
+                    ->counts('vehicles')
+                    ->label('Assigned Vehicles')
+                    ->alignEnd(),
             ])
+            ->stackedOnMobile()
             ->filters([
                 //
             ])
@@ -44,9 +42,6 @@ class DriversTable
             ])
             ->toolbarActions([
                 CreateAction::make(),
-                SortRecordsAction::make([
-                    'name' => 'Name',
-                ]),
             ])
             ->defaultSort('name');
     }

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Driver;
 use App\Models\Vehicle;
+use App\Models\VehicleDriver;
 use Illuminate\Database\Seeder;
 
 class GateSeeder extends Seeder
@@ -45,7 +46,7 @@ class GateSeeder extends Seeder
             $driver = Driver::query()->where('name', $driverName)->first();
 
             if ($vehicle && $driver) {
-                \App\Models\VehicleDriver::query()->updateOrCreate(
+                VehicleDriver::query()->updateOrCreate(
                     ['vehicle_id' => $vehicle->id, 'driver_id' => $driver->id],
                     ['active' => true],
                 );

@@ -7,8 +7,8 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\Item;
 use App\Models\SalesEmployee;
+use App\Services\InvoiceCalculator;
 use BackedEnum;
-use UnitEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -26,7 +26,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
-use Illuminate\Support\Facades\DB;
+use UnitEnum;
 
 class NewInvoice extends Page
 {
@@ -39,6 +39,13 @@ class NewInvoice extends Page
     protected static UnitEnum|string|null $navigationGroup = 'Sales – AR';
 
     protected static ?int $navigationSort = 10;
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function getNavigationLabel(): string
     {
@@ -78,24 +85,17 @@ class NewInvoice extends Page
 
         [$lines, $totals] = $this->computeLines($data['lines'] ?? []);
 
-        $invoice = DB::transaction(function () use ($data, $customer, $lines, $totals): Invoice {
-            $invoice = Invoice::query()->create([
-                'no' => Invoice::nextNumber(),
-                'customer_id' => $customer->id,
-                'posting_date' => $data['posting_date'],
-                'sales_employee_id' => ($data['sales_employee_id'] ?? null) ?: null,
-                'remarks' => trim((string) ($data['remarks'] ?? '')),
-                'total_before_discount' => sprintf('%.3F', $totals['before']),
-                'discount' => sprintf('%.3F', $totals['discount']),
-                'total_after_discount' => sprintf('%.3F', $totals['after']),
-                'needs_approval' => $totals['after'] > Invoice::APPROVAL_THRESHOLD,
-                'created_by' => auth()->id(),
-            ]);
-
-            $invoice->lines()->createMany($lines);
-
-            return $invoice;
-        });
+        $invoice = Invoice::createWithNextNumber([
+            'customer_id' => $customer->id,
+            'posting_date' => $data['posting_date'],
+            'sales_employee_id' => ($data['sales_employee_id'] ?? null) ?: null,
+            'remarks' => trim((string) ($data['remarks'] ?? '')),
+            'total_before_discount' => InvoiceCalculator::format($totals['before']),
+            'discount' => InvoiceCalculator::format($totals['discount']),
+            'total_after_discount' => InvoiceCalculator::format($totals['after']),
+            'needs_approval' => InvoiceCalculator::needsApproval($totals['after']),
+            'created_by' => auth()->id(),
+        ], $lines);
 
         Notification::make()
             ->title('Invoice created')
@@ -111,47 +111,7 @@ class NewInvoice extends Page
      */
     protected function computeLines(array $rows): array
     {
-        $lines = [];
-        $before = 0.0;
-        $after = 0.0;
-
-        foreach ($rows as $index => $row) {
-            $quantity = (float) ($row['quantity'] ?? 0);
-            $priceBefore = (float) ($row['price_before_discount'] ?? 0);
-            $discountPercent = min(max((float) ($row['discount'] ?? 0), 0), 100);
-
-            if ($quantity <= 0 && blank($row['item_code'] ?? null)) {
-                continue;
-            }
-
-            $priceAfter = round($priceBefore * (1 - ($discountPercent / 100)), 3);
-            $total = round($quantity * $priceAfter, 3);
-            $before += round($quantity * $priceBefore, 3);
-            $after += $total;
-
-            $lines[] = [
-                'line_no' => $index + 1,
-                'item_code' => trim((string) ($row['item_code'] ?? '')),
-                'item_description' => trim((string) ($row['item_description'] ?? '')),
-                'quantity' => sprintf('%.3F', $quantity),
-                'price_before_discount' => sprintf('%.3F', $priceBefore),
-                'discount' => sprintf('%.3F', $discountPercent),
-                'price_after_discount' => sprintf('%.3F', $priceAfter),
-                'total' => sprintf('%.3F', $total),
-            ];
-        }
-
-        $before = round($before, 3);
-        $after = round($after, 3);
-
-        return [
-            $lines,
-            [
-                'before' => $before,
-                'discount' => round($before - $after, 3),
-                'after' => $after,
-            ],
-        ];
+        return InvoiceCalculator::computeLines($rows);
     }
 
     public function form(Schema $schema): Schema
@@ -180,7 +140,7 @@ class NewInvoice extends Page
                             ->label('')
                             ->hidden(fn (): bool => ! $this->needsApproval())
                             ->content(fn (): string => 'Invoice will go for approval – Amount: '
-                                . number_format($this->totals()['after'], 3))
+                                .number_format($this->totals()['after'], 3))
                             ->badge()
                             ->color('warning'),
                     ]),
@@ -292,7 +252,7 @@ class NewInvoice extends Page
 
     protected function needsApproval(): bool
     {
-        return $this->totals()['after'] > Invoice::APPROVAL_THRESHOLD;
+        return InvoiceCalculator::needsApproval($this->totals()['after']);
     }
 
     protected function linesRepeater(): Repeater
@@ -506,26 +466,7 @@ class NewInvoice extends Page
      */
     protected function totals(): array
     {
-        $before = 0.0;
-        $after = 0.0;
-
-        foreach ($this->data['lines'] ?? [] as $row) {
-            $quantity = (float) ($row['quantity'] ?? 0);
-            $price = (float) ($row['price_before_discount'] ?? 0);
-            $discountPercent = min(max((float) ($row['discount'] ?? 0), 0), 100);
-
-            $before += $quantity * $price;
-            $after += $quantity * round($price * (1 - ($discountPercent / 100)), 3);
-        }
-
-        $before = round($before, 3);
-        $after = round($after, 3);
-
-        return [
-            'before' => $before,
-            'discount' => round($before - $after, 3),
-            'after' => $after,
-        ];
+        return InvoiceCalculator::totals($this->data['lines'] ?? []);
     }
 
     public function content(Schema $schema): Schema

@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Invoices\Tables;
 
-use App\Models\Invoice;
+use App\Filament\Resources\Invoices\Actions\PayMpesaAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -52,6 +52,7 @@ class InvoicesTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                PayMpesaAction::make(),
             ])
             ->toolbarActions([
                 //
