@@ -37,9 +37,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth('full')
             ->navigationGroups([
                 NavigationGroup::make('Master Data'),
-                //                    ->icon('heroicon-o-cog-6-tooth'),
                 NavigationGroup::make('Sales – AR'),
-                //                    ->icon('heroicon-o-banknotes'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
