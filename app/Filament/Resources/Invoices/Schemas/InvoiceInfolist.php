@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoices\Schemas;
 
 use App\Models\Invoice;
+use App\Models\MpesaTransaction;
 use App\Services\MpesaService;
 use Illuminate\Support\Carbon;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -235,6 +236,15 @@ class InvoiceInfolist
                                     ->formatStateUsing(fn (?string $state) => $state
                                         ? date('M j, Y g:i A', strtotime($state) ?: time())
                                         : '—'),
+                                TextEntry::make('mpesa_receipt_number')
+                                    ->label('Receipt No.')
+                                    ->placeholder(fn ($record) => $record->status === MpesaTransaction::STATUS_SUCCESS
+                                        ? 'Receipt pending — awaiting callback'
+                                        : '—')
+                                    ->badge()
+                                    ->color(fn ($record) => $record->status === MpesaTransaction::STATUS_SUCCESS && is_null($record->mpesa_receipt_number)
+                                        ? 'warning'
+                                        : ($record->mpesa_receipt_number ? 'success' : 'gray')),
                             ])
                             ->table([
                                 TableColumn::make('Trans ID'),

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Invoices\Actions;
 
+use App\Jobs\QueryStkPushStatus;
 use App\Models\Invoice;
 use App\Models\MpesaTransaction;
 use App\Services\MpesaService;
@@ -61,6 +62,8 @@ class PayMpesaAction
                         'trans_amount' => number_format($amount, 2, '.', ''),
                         'bill_ref_number' => $ref,
                         'invoice_number' => $ref,
+                        'raised_at' => now(),
+                        'invoice_id' => $record->id,
                     ]);
 
                     $response = $mpesaService->sendStkPush(
@@ -75,6 +78,9 @@ class PayMpesaAction
                         'merchant_request_id' => $response['MerchantRequestID'] ?? null,
                         'raw_payload' => json_encode($response),
                     ]);
+
+                    QueryStkPushStatus::dispatch($transaction->id)
+                        ->delay(now()->addSeconds(30));
 
                     Notification::make()
                         ->title('STK Push Sent')

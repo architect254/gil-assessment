@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\MpesaTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MpesaCallbackTest extends TestCase
@@ -142,7 +143,7 @@ class MpesaCallbackTest extends TestCase
         $response->assertOk();
         $this->assertDatabaseHas('mpesa_transactions', [
             'checkout_request_id' => 'ws_CO_FAIL_456',
-            'status' => MpesaTransaction::STATUS_FAILED,
+            'status' => MpesaTransaction::STATUS_TIMEOUT,
             'result_code' => '1037',
             'result_desc' => 'DS timeout user cannot be reached',
         ]);
@@ -245,17 +246,14 @@ class MpesaCallbackTest extends TestCase
     {
         $payload = $this->payload('DUP12345');
 
-        // First callback
         $res1 = $this->postJson('/api/mpesa/confirmation', $payload);
         $res1->assertOk()->assertJsonPath('ResultCode', 0);
         $this->assertSame(1, MpesaTransaction::query()->where('transaction_id', 'DUP12345')->count());
 
-        // Second duplicate callback
         $payload['TransAmount'] = '2000.00';
         $res2 = $this->postJson('/api/mpesa/confirmation', $payload);
         $res2->assertOk()->assertJsonPath('ResultCode', 0);
 
-        // Count must still be 1, amount updated
         $this->assertSame(1, MpesaTransaction::query()->where('transaction_id', 'DUP12345')->count());
         $this->assertSame('2000.00', MpesaTransaction::query()->where('transaction_id', 'DUP12345')->value('trans_amount'));
     }
@@ -275,5 +273,211 @@ class MpesaCallbackTest extends TestCase
 
         $this->assertSame(1, MpesaTransaction::count());
         $this->assertNotNull(MpesaTransaction::first()->raw_payload);
+    }
+
+    public function test_success_to_failed_callback_is_rejected(): void
+    {
+        $success = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_SUCCESS,
+            'checkout_request_id' => 'ws_CO_GUARD_TEST',
+            'transaction_id' => 'GUARD_TX_001',
+            'msisdn' => '254712345678',
+            'trans_amount' => '1000.00',
+            'bill_ref_number' => 'INV-99',
+        ]);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-99999-1',
+                    'CheckoutRequestID' => 'ws_CO_GUARD_TEST',
+                    'ResultCode' => 1,
+                    'ResultDesc' => 'Insufficient balance',
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $success->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_SUCCESS, $success->status);
+        $this->assertSame('GUARD_TX_001', $success->transaction_id);
+    }
+
+    public function test_late_callback_backfills_receipt_on_provisional_success(): void
+    {
+        $provisional = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_SUCCESS,
+            'checkout_request_id' => 'ws_CO_RECEIPT_TEST',
+            'msisdn' => '254712345678',
+            'trans_amount' => '5000.00',
+            'bill_ref_number' => 'INV-50',
+            'resolved_at' => now()->subMinutes(1),
+        ]);
+
+        $this->assertNull($provisional->mpesa_receipt_number);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-88888-1',
+                    'CheckoutRequestID' => 'ws_CO_RECEIPT_TEST',
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'The service request is processed successfully.',
+                    'CallbackMetadata' => [
+                        'items' => [
+                            ['Name' => 'Amount', 'Value' => 5000.00],
+                            ['Name' => 'Msisdn', 'Value' => 254712345678],
+                            ['Name' => 'TransID', 'Value' => 'RKTQRCPT99'],
+                            ['Name' => 'MpesaReceiptNumber', 'Value' => 'RKTQRCPT99'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $provisional->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_SUCCESS, $provisional->status);
+        $this->assertSame('RKTQRCPT99', $provisional->mpesa_receipt_number);
+        $this->assertSame('RKTQRCPT99', $provisional->transaction_id);
+    }
+
+    public function test_late_callback_does_not_clobber_invoice_id_or_raised_at(): void
+    {
+        // Create a pending record directly via DB to set raised_at (not in Fillable)
+        DB::table('mpesa_transactions')->insert([
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_CLOBBER_TEST',
+            'msisdn' => '254712345678',
+            'trans_amount' => '2500.00',
+            'bill_ref_number' => 'INV-77',
+            'raised_at' => now()->subMinutes(2),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $pending = MpesaTransaction::where('checkout_request_id', 'ws_CO_CLOBBER_TEST')->first();
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-77777-1',
+                    'CheckoutRequestID' => 'ws_CO_CLOBBER_TEST',
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'Success',
+                    'CallbackMetadata' => [
+                        'items' => [
+                            ['Name' => 'Amount', 'Value' => 2500.00],
+                            ['Name' => 'Msisdn', 'Value' => 254712345678],
+                            ['Name' => 'TransID', 'Value' => 'RKTQCLOB77'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $pending->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_SUCCESS, $pending->status);
+        $this->assertNull($pending->invoice_id);
+        $this->assertNotNull($pending->raised_at);
+    }
+
+    public function test_timeout_result_code_1037_maps_correctly(): void
+    {
+        $pending = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_TIMEOUT_TEST',
+            'msisdn' => '254712345678',
+            'trans_amount' => '750.00',
+            'bill_ref_number' => 'INV-80',
+        ]);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-66666-1',
+                    'CheckoutRequestID' => 'ws_CO_TIMEOUT_TEST',
+                    'ResultCode' => 1037,
+                    'ResultDesc' => 'DS timeout user cannot be reached',
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $pending->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_TIMEOUT, $pending->status);
+        $this->assertSame('1037', $pending->result_code);
+        $this->assertNotNull($pending->resolved_at);
+    }
+
+    public function test_mpesa_receipt_number_extracted_from_callback_metadata(): void
+    {
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-55555-1',
+                    'CheckoutRequestID' => 'ws_CO_RECEIPT_EXTRACT',
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'Success',
+                    'CallbackMetadata' => [
+                        'items' => [
+                            ['Name' => 'Amount', 'Value' => 3000.00],
+                            ['Name' => 'Msisdn', 'Value' => 254798765432],
+                            ['Name' => 'TransID', 'Value' => 'RKTQEXTR55'],
+                            ['Name' => 'MpesaReceiptNumber', 'Value' => 'RKTQEXTR55'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $this->assertDatabaseHas('mpesa_transactions', [
+            'checkout_request_id' => 'ws_CO_RECEIPT_EXTRACT',
+            'mpesa_receipt_number' => 'RKTQEXTR55',
+            'status' => MpesaTransaction::STATUS_SUCCESS,
+        ]);
+    }
+
+    public function test_resolved_at_set_on_callback(): void
+    {
+        $pending = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_RESOLVED_TEST',
+            'msisdn' => '254712345678',
+            'trans_amount' => '1500.00',
+            'bill_ref_number' => 'INV-60',
+        ]);
+
+        $this->assertNull($pending->resolved_at);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-44444-1',
+                    'CheckoutRequestID' => 'ws_CO_RESOLVED_TEST',
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'Success',
+                    'CallbackMetadata' => [
+                        'items' => [
+                            ['Name' => 'Amount', 'Value' => 1500.00],
+                            ['Name' => 'Msisdn', 'Value' => 254712345678],
+                            ['Name' => 'TransID', 'Value' => 'RKTQRES60'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $pending->refresh();
+        $this->assertNotNull($pending->resolved_at);
     }
 }

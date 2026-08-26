@@ -62,17 +62,60 @@ class MpesaCallbackController extends Controller
             $transaction = MpesaTransaction::fromCallback($payload);
 
             if (filled($transaction->checkout_request_id)) {
-                // STK push callbacks always have a CheckoutRequestID.
-                // Match on it first to update the pending record created on initiation.
-                MpesaTransaction::query()->updateOrCreate(
-                    ['checkout_request_id' => $transaction->checkout_request_id],
-                    $transaction->getAttributes(),
-                );
+                $existing = MpesaTransaction::query()
+                    ->where('checkout_request_id', $transaction->checkout_request_id)
+                    ->first();
+
+                if ($existing) {
+                    if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
+                        // Allowed transition: merge callback fields, exclude invoice_id/raised_at to prevent nullification
+                        $existing->update(array_merge(
+                            collect($transaction->getAttributes())
+                                ->except(['invoice_id', 'raised_at'])
+                                ->toArray(),
+                            ['resolved_at' => now()],
+                        ));
+                    } else {
+                        // Late callback at already-settled transaction: backfill receipt + metadata only, no status change
+                        $existing->update(collect($transaction->only([
+                            'mpesa_receipt_number',
+                            'trans_time',
+                            'trans_amount',
+                            'org_account_balance',
+                            'first_name',
+                            'middle_name',
+                            'last_name',
+                            'raw_payload',
+                        ]))->filter()->toArray());
+                    }
+                } else {
+                    // No existing record — first time seeing this checkout_request_id
+                    $transaction->resolved_at = now();
+                    $transaction->save();
+                }
             } elseif (filled($transaction->transaction_id)) {
-                MpesaTransaction::query()->updateOrCreate(
-                    ['transaction_id' => $transaction->transaction_id],
-                    $transaction->getAttributes(),
-                );
+                $existing = MpesaTransaction::query()
+                    ->where('transaction_id', $transaction->transaction_id)
+                    ->first();
+
+                if ($existing) {
+                    if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
+                        $existing->update(array_merge(
+                            collect($transaction->getAttributes())
+                                ->except(['invoice_id', 'raised_at'])
+                                ->toArray(),
+                            ['resolved_at' => now()],
+                        ));
+                    } else {
+                        $existing->update($transaction->only([
+                            'mpesa_receipt_number',
+                            'raw_payload',
+                        ]));
+                    }
+                } else {
+                    $transaction->resolved_at = now();
+                    $transaction->save();
+                }
             } else {
                 $transaction->save();
             }

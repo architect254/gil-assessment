@@ -5,7 +5,9 @@ namespace App\Filament\Resources\MpesaTransactions\Tables;
 use App\Models\MpesaTransaction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class MpesaTransactionsTable
 {
@@ -20,12 +22,14 @@ class MpesaTransactionsTable
                         MpesaTransaction::STATUS_SUCCESS => 'success',
                         MpesaTransaction::STATUS_FAILED => 'danger',
                         MpesaTransaction::STATUS_CANCELLED => 'warning',
+                        MpesaTransaction::STATUS_TIMEOUT => 'danger',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         MpesaTransaction::STATUS_SUCCESS => 'Success',
                         MpesaTransaction::STATUS_FAILED => 'Failed',
                         MpesaTransaction::STATUS_CANCELLED => 'Cancelled',
+                        MpesaTransaction::STATUS_TIMEOUT => 'Timeout',
                         default => 'Pending',
                     })
                     ->searchable()
@@ -80,7 +84,9 @@ class MpesaTransactionsTable
                     ->sortable(),
             ])
             ->filters([
-                //
+                Filter::make('receipt_pending')
+                    ->label(fn () => 'Receipt pending (' . MpesaTransaction::isReceiptPending()->count() . ')')
+                    ->query(fn (Builder $query) => MpesaTransaction::isReceiptPending()),
             ])
             ->recordActions([
                 ViewAction::make(),

@@ -3,11 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'status',
+    'invoice_id',
+    'raised_at',
+    'resolved_at',
+    'mpesa_receipt_number',
     'transaction_type',
     'transaction_id',
     'result_code',
@@ -35,6 +40,7 @@ class MpesaTransaction extends Model
     public const STATUS_SUCCESS = 'success';
     public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_TIMEOUT = 'timeout';
 
     /**
      * Derive transaction status from M-Pesa ResultCode.
@@ -50,8 +56,45 @@ class MpesaTransaction extends Model
         return match ($resultCode) {
             '0' => static::STATUS_SUCCESS,
             '1032' => static::STATUS_CANCELLED,
+            '1037' => static::STATUS_TIMEOUT,
             default => static::STATUS_FAILED,
         };
+    }
+
+    /**
+     * Determine whether a status transition is allowed.
+     *
+     * Rules:
+     *  - pending → anything (first settlement)
+     *  - success → success only (idempotent re-apply)
+     *  - non-success settled → success (late confirmation)
+     *  - everything else → rejected (never regress, never overwrite settled with noise)
+     */
+    public static function isTransitionAllowed(string $current, string $incoming): bool
+    {
+        if ($current === static::STATUS_PENDING) {
+            return true;
+        }
+
+        if ($current === static::STATUS_SUCCESS && $incoming === static::STATUS_SUCCESS) {
+            return true;
+        }
+
+        if ($current !== static::STATUS_SUCCESS && $incoming === static::STATUS_SUCCESS) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Scope: transactions marked success but missing a receipt number (provisional success).
+     */
+    public static function isReceiptPending(): Builder
+    {
+        return static::query()
+            ->where('status', static::STATUS_SUCCESS)
+            ->whereNull('mpesa_receipt_number');
     }
 
     /**
@@ -138,6 +181,10 @@ class MpesaTransaction extends Model
                 data_get($payload, 'LastName')
                 ?? data_get($callback, 'LastName')
                 ?? data_get($callback, 'fields.LastName')
+            ),
+            'mpesa_receipt_number' => $string(
+                data_get($callback, 'fields.MpesaReceiptNumber')
+                ?? data_get($callback, 'MpesaReceiptNumber')
             ),
             'raw_payload' => json_encode($payload),
         ]);
