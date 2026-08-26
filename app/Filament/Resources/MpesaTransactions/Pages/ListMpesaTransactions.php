@@ -14,6 +14,15 @@ class ListMpesaTransactions extends ListRecords
 {
     protected static string $resource = MpesaTransactionResource::class;
 
+    public function getTablePollingInterval(): ?string
+    {
+        $hasPending = MpesaTransaction::where('status', MpesaTransaction::STATUS_PENDING)
+            ->where('created_at', '>', now()->subMinutes(15))
+            ->exists();
+
+        return $hasPending ? '5s' : null;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
