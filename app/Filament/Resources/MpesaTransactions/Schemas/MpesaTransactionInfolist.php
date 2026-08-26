@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MpesaTransactions\Schemas;
 
+use App\Models\MpesaTransaction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -15,10 +16,26 @@ class MpesaTransactionInfolist
                 Section::make('Transaction Overview')
                     ->columns(4)
                     ->schema([
+                        TextEntry::make('status')
+                            ->label('Status')
+                            ->badge()
+                            ->color(fn (string $state): string => match ($state) {
+                                MpesaTransaction::STATUS_SUCCESS => 'success',
+                                MpesaTransaction::STATUS_FAILED => 'danger',
+                                MpesaTransaction::STATUS_CANCELLED => 'warning',
+                                default => 'gray',
+                            })
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                MpesaTransaction::STATUS_SUCCESS => 'Success',
+                                MpesaTransaction::STATUS_FAILED => 'Failed',
+                                MpesaTransaction::STATUS_CANCELLED => 'Cancelled',
+                                default => 'Pending',
+                            }),
                         TextEntry::make('transaction_id')
                             ->label('Transaction ID')
                             ->badge()
-                            ->color('primary'),
+                            ->color('primary')
+                            ->placeholder('Awaiting callback…'),
                         TextEntry::make('trans_amount')
                             ->label('Amount (KES)')
                             ->numeric(decimalPlaces: 2)
@@ -50,6 +67,30 @@ class MpesaTransactionInfolist
                             ->label('Received At')
                             ->dateTime(),
                     ]),
+                Section::make('Daraja API Response')
+                    ->description(fn (?MpesaTransaction $record): string => match ($record?->status) {
+                        MpesaTransaction::STATUS_PENDING => 'STK push sent — awaiting customer action and Safaricom callback.',
+                        MpesaTransaction::STATUS_SUCCESS => 'Transaction completed successfully.',
+                        MpesaTransaction::STATUS_CANCELLED => 'Customer cancelled the STK push prompt.',
+                        MpesaTransaction::STATUS_FAILED => 'Transaction failed.',
+                        default => '',
+                    })
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('result_code')
+                            ->label('Result Code')
+                            ->placeholder('—'),
+                        TextEntry::make('result_desc')
+                            ->label('Result Description')
+                            ->placeholder('—')
+                            ->columnSpanFull(),
+                        TextEntry::make('checkout_request_id')
+                            ->label('Checkout Request ID')
+                            ->placeholder('—'),
+                        TextEntry::make('merchant_request_id')
+                            ->label('Merchant Request ID')
+                            ->placeholder('—'),
+                    ]),
                 Section::make('Raw Daraja Webhook Payload')
                     ->columnSpanFull()
                     ->collapsible()
@@ -58,7 +99,7 @@ class MpesaTransactionInfolist
                             ->hiddenLabel()
                             ->formatStateUsing(function (?string $state): string {
                                 if (empty($state)) {
-                                    return 'No raw payload recorded.';
+                                    return 'No payload recorded.';
                                 }
 
                                 $decoded = json_decode($state, true);

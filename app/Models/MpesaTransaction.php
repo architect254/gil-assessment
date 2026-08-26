@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
+    'status',
     'transaction_type',
     'transaction_id',
+    'result_code',
+    'result_desc',
+    'checkout_request_id',
+    'merchant_request_id',
     'trans_time',
     'trans_amount',
     'business_short_code',
@@ -26,16 +31,38 @@ class MpesaTransaction extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SUCCESS = 'success';
+    public const STATUS_FAILED = 'failed';
+    public const STATUS_CANCELLED = 'cancelled';
+
     /**
-     * Map a raw M-Pesa C2B callback payload to model attributes.
-     * Every field is stored as a string.
+     * Derive transaction status from M-Pesa ResultCode.
+     * C2B callbacks (direct paybill) have no ResultCode and are inherently successful.
+     */
+    public static function resolveStatus(?string $resultCode, bool $isStkCallback = false): string
+    {
+        if ($resultCode === null) {
+            // C2B confirmation callbacks have no ResultCode — they're successful transactions.
+            return $isStkCallback ? static::STATUS_PENDING : static::STATUS_SUCCESS;
+        }
+
+        return match ($resultCode) {
+            '0' => static::STATUS_SUCCESS,
+            '1032' => static::STATUS_CANCELLED,
+            default => static::STATUS_FAILED,
+        };
+    }
+
+    /**
+     * Map a raw M-Pesa callback payload to model attributes.
      */
     public static function fromCallback(array $payload): self
     {
         $callback = data_get($payload, 'Body.stkCallback', data_get($payload, 'Body'));
 
+        // STK push callbacks store metadata in CallbackMetadata.items
         if (is_array(data_get($callback, 'CallbackMetadata.items'))) {
-            // STK push style: items is a list of {Name, Value}
             foreach (data_get($callback, 'CallbackMetadata.items', []) as $entry) {
                 $callback['fields'][$entry['Name'] ?? ''] = $entry['Value'] ?? null;
             }
@@ -43,7 +70,13 @@ class MpesaTransaction extends Model
 
         $string = static fn (mixed $value): ?string => $value === null ? null : (string) $value;
 
+        $resultCode = $string(data_get($callback, 'ResultCode'));
+        $checkoutRequestId = $string(data_get($callback, 'CheckoutRequestID'));
+        $merchantRequestId = $string(data_get($callback, 'MerchantRequestID'));
+        $isStkCallback = data_get($payload, 'Body.stkCallback') !== null;
+
         return new static([
+            'status' => static::resolveStatus($resultCode, $isStkCallback),
             'transaction_type' => $string(data_get($payload, 'TransactionType')),
             'transaction_id' => $string(
                 data_get($payload, 'TransactionID')
@@ -51,6 +84,10 @@ class MpesaTransaction extends Model
                 ?? data_get($callback, 'TransactionID')
                 ?? data_get($callback, 'fields.TransID')
             ),
+            'result_code' => $resultCode,
+            'result_desc' => $string(data_get($callback, 'ResultDesc')),
+            'checkout_request_id' => $checkoutRequestId,
+            'merchant_request_id' => $merchantRequestId,
             'trans_time' => $string(
                 data_get($payload, 'TransTime')
                 ?? data_get($callback, 'TransTime')

@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\MpesaTransaction;
 use App\Services\MpesaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -123,32 +122,6 @@ class MpesaServiceTest extends TestCase
         });
     }
 
-    public function test_simulate_payment_creates_persisted_transaction(): void
-    {
-        $transaction = $this->service->simulatePayment(
-            phone: '0712345678',
-            amount: 5000.00,
-            billRef: 'INV-5',
-            transId: 'SIM1234567',
-            firstName: 'Alice',
-            lastName: 'Smith'
-        );
-
-        $this->assertInstanceOf(MpesaTransaction::class, $transaction);
-        $this->assertSame('SIM1234567', $transaction->transaction_id);
-        $this->assertSame('254712345678', $transaction->msisdn);
-        $this->assertSame('5000.00', $transaction->trans_amount);
-        $this->assertSame('INV-5', $transaction->bill_ref_number);
-        $this->assertSame('Alice', $transaction->first_name);
-
-        $this->assertDatabaseHas('mpesa_transactions', [
-            'transaction_id' => 'SIM1234567',
-            'msisdn' => '254712345678',
-            'trans_amount' => '5000.00',
-            'bill_ref_number' => 'INV-5',
-        ]);
-    }
-
     public function test_find_invoice_for_reference_finds_by_raw_or_prefixed_number(): void
     {
         $customer = Customer::create([
@@ -188,9 +161,42 @@ class MpesaServiceTest extends TestCase
             'total_after_discount' => 1500.000,
         ]);
 
-        $this->service->simulatePayment('0712345678', 500.00, 'INV-' . $invoice->no, 'TX1');
-        $this->service->simulatePayment('0712345678', 1000.00, (string) $invoice->no, 'TX2');
-        $this->service->simulatePayment('0712345678', 999.00, 'INV-999', 'TX3');
+        // Create transactions directly via C2B callback payload (the only way to create them now)
+        $this->postJson('/api/mpesa/confirmation', [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'TX1',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '500.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-' . $invoice->no,
+            'MSISDN' => '254712345678',
+            'FirstName' => 'Test',
+            'LastName' => 'User',
+        ]);
+
+        $this->postJson('/api/mpesa/confirmation', [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'TX2',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '1000.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => (string) $invoice->no,
+            'MSISDN' => '254712345678',
+            'FirstName' => 'Test',
+            'LastName' => 'User',
+        ]);
+
+        $this->postJson('/api/mpesa/confirmation', [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'TX3',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '999.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-999',
+            'MSISDN' => '254712345678',
+            'FirstName' => 'Test',
+            'LastName' => 'User',
+        ]);
 
         $transactions = $this->service->getTransactionsForInvoice($invoice);
 

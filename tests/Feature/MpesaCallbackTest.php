@@ -42,6 +42,7 @@ class MpesaCallbackTest extends TestCase
             'bill_ref_number' => 'INV-1',
             'msisdn' => '254712345678',
             'first_name' => 'John',
+            'status' => MpesaTransaction::STATUS_SUCCESS,
         ]);
     }
 
@@ -50,7 +51,10 @@ class MpesaCallbackTest extends TestCase
         $response = $this->postJson('/api/mpesa/validation', $this->payload('VAL001'));
 
         $response->assertOk()->assertJsonPath('ResultCode', 0);
-        $this->assertDatabaseHas('mpesa_transactions', ['transaction_id' => 'VAL001']);
+        $this->assertDatabaseHas('mpesa_transactions', [
+            'transaction_id' => 'VAL001',
+            'status' => MpesaTransaction::STATUS_SUCCESS,
+        ]);
     }
 
     public function test_duplicate_callbacks_are_idempotent(): void
@@ -61,7 +65,7 @@ class MpesaCallbackTest extends TestCase
         $this->assertSame(1, MpesaTransaction::query()->where('transaction_id', 'SBX12345ABC')->count());
     }
 
-    public function test_stk_push_style_payload_is_parsed(): void
+    public function test_stk_push_success_payload_is_parsed(): void
     {
         $payload = [
             'Body' => [
@@ -88,7 +92,126 @@ class MpesaCallbackTest extends TestCase
             'transaction_id' => 'RKTQDM7W6S',
             'msisdn' => '254712345678',
             'trans_amount' => '1',
+            'status' => MpesaTransaction::STATUS_SUCCESS,
+            'result_code' => '0',
+            'checkout_request_id' => 'ws_CO_DMZ_12321_23423476',
+            'merchant_request_id' => '29115-34620561-1',
         ]);
+    }
+
+    public function test_stk_push_cancellation_is_recorded(): void
+    {
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-34620561-1',
+                    'CheckoutRequestID' => 'ws_CO_CANCEL_123',
+                    'ResultCode' => 1032,
+                    'ResultDesc' => 'Request cancelled by user',
+                ],
+            ],
+        ];
+
+        $response = $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('mpesa_transactions', [
+            'checkout_request_id' => 'ws_CO_CANCEL_123',
+            'status' => MpesaTransaction::STATUS_CANCELLED,
+            'result_code' => '1032',
+            'result_desc' => 'Request cancelled by user',
+            'merchant_request_id' => '29115-34620561-1',
+        ]);
+    }
+
+    public function test_stk_push_failure_is_recorded(): void
+    {
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-34620561-1',
+                    'CheckoutRequestID' => 'ws_CO_FAIL_456',
+                    'ResultCode' => 1037,
+                    'ResultDesc' => 'DS timeout user cannot be reached',
+                ],
+            ],
+        ];
+
+        $response = $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('mpesa_transactions', [
+            'checkout_request_id' => 'ws_CO_FAIL_456',
+            'status' => MpesaTransaction::STATUS_FAILED,
+            'result_code' => '1037',
+            'result_desc' => 'DS timeout user cannot be reached',
+        ]);
+    }
+
+    public function test_stk_push_cancellation_updates_pending_record(): void
+    {
+        $pending = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_MATCH_789',
+            'msisdn' => '254712345678',
+            'trans_amount' => '1000.00',
+            'bill_ref_number' => 'INV-1',
+        ]);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-34620561-1',
+                    'CheckoutRequestID' => 'ws_CO_MATCH_789',
+                    'ResultCode' => 1032,
+                    'ResultDesc' => 'Request cancelled by user',
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $pending->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_CANCELLED, $pending->status);
+        $this->assertSame('1032', $pending->result_code);
+        $this->assertSame('Request cancelled by user', $pending->result_desc);
+        $this->assertSame('29115-34620561-1', $pending->merchant_request_id);
+    }
+
+    public function test_stk_push_success_updates_pending_record(): void
+    {
+        $pending = MpesaTransaction::create([
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_SUCCESS_999',
+            'msisdn' => '254712345678',
+            'trans_amount' => '2500.00',
+            'bill_ref_number' => 'INV-2',
+        ]);
+
+        $payload = [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => '29115-34620561-1',
+                    'CheckoutRequestID' => 'ws_CO_SUCCESS_999',
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'The service request is processed successfully.',
+                    'CallbackMetadata' => [
+                        'items' => [
+                            ['Name' => 'Amount', 'Value' => 2500.00],
+                            ['Name' => 'Msisdn', 'Value' => 254712345678],
+                            ['Name' => 'TransID', 'Value' => 'RKTQDM7W6S'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/mpesa/confirmation', $payload);
+
+        $pending->refresh();
+        $this->assertSame(MpesaTransaction::STATUS_SUCCESS, $pending->status);
+        $this->assertSame('0', $pending->result_code);
+        $this->assertSame('RKTQDM7W6S', $pending->transaction_id);
     }
 
     public function test_lookup_endpoint_returns_transaction_data(): void
@@ -100,7 +223,8 @@ class MpesaCallbackTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.transaction_id', 'SBX12345ABC')
             ->assertJsonPath('data.amount', '1500.00')
-            ->assertJsonPath('data.customer', 'John Doe');
+            ->assertJsonPath('data.customer', 'John Doe')
+            ->assertJsonPath('data.status', 'success');
     }
 
     public function test_callback_secret_is_enforced_when_configured(): void

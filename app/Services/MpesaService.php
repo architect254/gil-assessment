@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use App\Models\MpesaTransaction;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Exception;
 use InvalidArgumentException;
 use RuntimeException;
@@ -138,45 +137,6 @@ class MpesaService
             }
             throw new RuntimeException('STK Push request error: ' . $e->getMessage(), 0, $e);
         }
-    }
-
-    /**
-     * Simulate an instant M-Pesa C2B/STK callback transaction locally.
-     */
-    public function simulatePayment(
-        string $phone,
-        float $amount,
-        string $billRef = '',
-        ?string $transId = null,
-        string $firstName = 'Simulated',
-        string $lastName = 'Customer'
-    ): MpesaTransaction {
-        $normalizedPhone = $this->normalizePhoneNumber($phone);
-        $transId = $transId ?: 'SIM' . strtoupper(Str::random(7));
-        $shortcode = (string) config('mpesa.shortcode', '174379');
-
-        $payload = [
-            'TransactionType' => 'Pay Bill',
-            'TransID' => $transId,
-            'TransTime' => now()->format('YmdHis'),
-            'TransAmount' => number_format($amount, 2, '.', ''),
-            'BusinessShortCode' => $shortcode,
-            'BillRefNumber' => $billRef,
-            'InvoiceNumber' => $billRef,
-            'OrgAccountBalance' => '50000.00',
-            'ThirdPartyTransID' => '',
-            'MSISDN' => $normalizedPhone,
-            'FirstName' => $firstName,
-            'MiddleName' => '',
-            'LastName' => $lastName,
-        ];
-
-        $transaction = MpesaTransaction::fromCallback($payload);
-
-        return MpesaTransaction::query()->updateOrCreate(
-            ['transaction_id' => $transaction->transaction_id],
-            $transaction->attributesToArray()
-        );
     }
 
     /**

@@ -32,6 +32,9 @@ class MpesaCallbackController extends Controller
         return response()->json([
             'data' => [
                 'transaction_id' => $transaction->transaction_id,
+                'status' => $transaction->status,
+                'result_code' => $transaction->result_code,
+                'result_desc' => $transaction->result_desc,
                 'amount' => $transaction->trans_amount,
                 'bill_ref_number' => $transaction->bill_ref_number,
                 'msisdn' => $transaction->msisdn,
@@ -56,10 +59,16 @@ class MpesaCallbackController extends Controller
         $payload = $request->all();
 
         try {
-            // Idempotent upsert – M-Pesa may retry callbacks.
             $transaction = MpesaTransaction::fromCallback($payload);
 
-            if (filled($transaction->transaction_id)) {
+            if (filled($transaction->checkout_request_id)) {
+                // STK push callbacks always have a CheckoutRequestID.
+                // Match on it first to update the pending record created on initiation.
+                MpesaTransaction::query()->updateOrCreate(
+                    ['checkout_request_id' => $transaction->checkout_request_id],
+                    $transaction->getAttributes(),
+                );
+            } elseif (filled($transaction->transaction_id)) {
                 MpesaTransaction::query()->updateOrCreate(
                     ['transaction_id' => $transaction->transaction_id],
                     $transaction->getAttributes(),

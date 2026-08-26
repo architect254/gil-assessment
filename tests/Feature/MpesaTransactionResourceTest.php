@@ -6,7 +6,6 @@ use App\Filament\Resources\MpesaTransactions\Pages\ListMpesaTransactions;
 use App\Filament\Resources\MpesaTransactions\Pages\ViewMpesaTransaction;
 use App\Models\MpesaTransaction;
 use App\Models\User;
-use App\Services\MpesaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -38,20 +37,26 @@ class MpesaTransactionResourceTest extends TestCase
 
     public function test_transactions_table_renders_records_and_columns(): void
     {
-        $service = app(MpesaService::class);
-        $tx = $service->simulatePayment(
-            phone: '0712345678',
-            amount: 3500.00,
-            billRef: 'INV-42',
-            transId: 'TX_RENDER_1',
-            firstName: 'Wanjiku',
-            lastName: 'Njoroge'
-        );
+        // Create a transaction via the C2B confirmation callback
+        $this->postJson('/api/mpesa/confirmation', [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'TX_RENDER_1',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '3500.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-42',
+            'MSISDN' => '254712345678',
+            'FirstName' => 'Wanjiku',
+            'LastName' => 'Njoroge',
+        ]);
+
+        $tx = MpesaTransaction::query()->where('transaction_id', 'TX_RENDER_1')->first();
 
         Livewire::actingAs($this->user)
             ->test(ListMpesaTransactions::class)
             ->assertCanSeeTableRecords([$tx])
             ->assertTableColumnExists('transaction_id')
+            ->assertTableColumnExists('status')
             ->assertTableColumnExists('trans_amount')
             ->assertTableColumnExists('msisdn')
             ->assertTableColumnExists('bill_ref_number')
@@ -62,29 +67,6 @@ class MpesaTransactionResourceTest extends TestCase
             ->assertSee('254712345678')
             ->assertSee('INV-42')
             ->assertSee('Wanjiku Njoroge');
-    }
-
-    public function test_header_action_can_execute_simulated_test_payment(): void
-    {
-        Livewire::actingAs($this->user)
-            ->test(ListMpesaTransactions::class)
-            ->callAction('testPayment', data: [
-                'mode' => 'simulate',
-                'phone_number' => '0711223344',
-                'amount' => 1500.00,
-                'bill_ref_number' => 'SANDBOX-001',
-                'first_name' => 'Demo',
-                'last_name' => 'Tester',
-            ])
-            ->assertHasNoActionErrors();
-
-        $this->assertDatabaseHas('mpesa_transactions', [
-            'msisdn' => '254711223344',
-            'trans_amount' => '1500.00',
-            'bill_ref_number' => 'SANDBOX-001',
-            'first_name' => 'Demo',
-            'last_name' => 'Tester',
-        ]);
     }
 
     public function test_header_action_can_dispatch_live_stk_push(): void
@@ -112,12 +94,28 @@ class MpesaTransactionResourceTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(ListMpesaTransactions::class)
             ->callAction('testPayment', data: [
-                'mode' => 'stk_push',
                 'phone_number' => '0712345678',
                 'amount' => 200.00,
                 'bill_ref_number' => 'SANDBOX-LIVE',
             ])
             ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas('mpesa_transactions', [
+            'msisdn' => '254712345678',
+            'trans_amount' => '200.00',
+            'bill_ref_number' => 'SANDBOX-LIVE',
+            'status' => MpesaTransaction::STATUS_PENDING,
+            'checkout_request_id' => 'ws_CO_TEST_LIVE',
+            'merchant_request_id' => 'REQ-TEST-1',
+        ]);
+
+        $transaction = MpesaTransaction::query()
+            ->where('checkout_request_id', 'ws_CO_TEST_LIVE')
+            ->first();
+
+        $this->assertNotNull($transaction->raw_payload);
+        $decoded = json_decode($transaction->raw_payload, true);
+        $this->assertSame('ws_CO_TEST_LIVE', $decoded['CheckoutRequestID']);
 
         Http::assertSent(function ($request) {
             return $request->url() === 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
@@ -126,13 +124,20 @@ class MpesaTransactionResourceTest extends TestCase
 
     public function test_view_transaction_page_renders_payload_details(): void
     {
-        $service = app(MpesaService::class);
-        $tx = $service->simulatePayment(
-            phone: '0712345678',
-            amount: 7500.00,
-            billRef: 'INV-99',
-            transId: 'TX_VIEW_DETAIL_1'
-        );
+        // Create a transaction via the C2B confirmation callback
+        $this->postJson('/api/mpesa/confirmation', [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'TX_VIEW_DETAIL_1',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '7500.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-99',
+            'MSISDN' => '254712345678',
+            'FirstName' => 'Test',
+            'LastName' => 'User',
+        ]);
+
+        $tx = MpesaTransaction::query()->where('transaction_id', 'TX_VIEW_DETAIL_1')->first();
 
         Livewire::actingAs($this->user)
             ->test(ViewMpesaTransaction::class, ['record' => $tx->getRouteKey()])
@@ -140,6 +145,7 @@ class MpesaTransactionResourceTest extends TestCase
             ->assertSee('TX_VIEW_DETAIL_1')
             ->assertSee('7,500.00')
             ->assertSee('254712345678')
+            ->assertSee('Daraja API Response')
             ->assertSee('Raw Daraja Webhook Payload');
     }
 }

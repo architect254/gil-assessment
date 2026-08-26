@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\MpesaTransactions\Pages;
 
 use App\Filament\Resources\MpesaTransactions\MpesaTransactionResource;
+use App\Models\MpesaTransaction;
 use App\Services\MpesaService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -18,21 +18,13 @@ class ListMpesaTransactions extends ListRecords
     {
         return [
             Action::make('testPayment')
-                ->label('Test Payment')
+                ->label('Test STK Push')
                 ->icon('heroicon-o-banknotes')
                 ->color('primary')
-                ->modalHeading('M-Pesa Sandbox Payment')
-                ->modalDescription('Execute a simulated callback or initiate a live STK push test.')
-                ->modalSubmitActionLabel('Execute')
+                ->modalHeading('Test M-Pesa STK Push')
+                ->modalDescription('Initiate a live STK push to test the Daraja API integration.')
+                ->modalSubmitActionLabel('Send STK Push')
                 ->form([
-                    Radio::make('mode')
-                        ->label('Execution Mode')
-                        ->options([
-                            'simulate' => 'Local Simulation (Instant demo callback)',
-                            'stk_push' => 'Live STK Push (Daraja API mobile prompt)',
-                        ])
-                        ->default('simulate')
-                        ->required(),
                     TextInput::make('phone_number')
                         ->label('Phone Number')
                         ->default('0712345678')
@@ -53,54 +45,46 @@ class ListMpesaTransactions extends ListRecords
                         ->default('DEMO-001')
                         ->placeholder('e.g. INV-1 or DEMO-001')
                         ->required(),
-                    TextInput::make('first_name')
-                        ->label('First Name')
-                        ->default('Demo'),
-                    TextInput::make('last_name')
-                        ->label('Last Name')
-                        ->default('User'),
                 ])
                 ->action(function (array $data, MpesaService $mpesaService): void {
                     $phone = (string) $data['phone_number'];
                     $amount = (float) $data['amount'];
                     $ref = (string) $data['bill_ref_number'];
-                    $mode = $data['mode'] ?? 'simulate';
 
-                    if ($mode === 'simulate') {
-                        $transaction = $mpesaService->simulatePayment(
+                    try {
+                        $normalizedPhone = $mpesaService->normalizePhoneNumber($phone);
+
+                        $transaction = MpesaTransaction::create([
+                            'status' => MpesaTransaction::STATUS_PENDING,
+                            'msisdn' => $normalizedPhone,
+                            'trans_amount' => number_format($amount, 2, '.', ''),
+                            'bill_ref_number' => $ref,
+                        ]);
+
+                        $response = $mpesaService->sendStkPush(
                             phone: $phone,
                             amount: $amount,
-                            billRef: $ref,
-                            firstName: (string) ($data['first_name'] ?? 'Demo'),
-                            lastName: (string) ($data['last_name'] ?? 'User')
+                            reference: $ref,
+                            description: 'Test Payment'
                         );
 
-                        Notification::make()
-                            ->title('Test Payment Simulated')
-                            ->body("Transaction {$transaction->transaction_id} for KES " . number_format($amount, 2) . " created successfully.")
-                            ->success()
-                            ->send();
-                    } else {
-                        try {
-                            $response = $mpesaService->sendStkPush(
-                                phone: $phone,
-                                amount: $amount,
-                                reference: $ref,
-                                description: 'Test Payment'
-                            );
+                        $transaction->update([
+                            'checkout_request_id' => $response['CheckoutRequestID'] ?? null,
+                            'merchant_request_id' => $response['MerchantRequestID'] ?? null,
+                            'raw_payload' => json_encode($response),
+                        ]);
 
-                            Notification::make()
-                                ->title('STK Push Request Dispatched')
-                                ->body("STK prompt sent to {$phone}. CheckoutRequestID: " . ($response['CheckoutRequestID'] ?? 'OK'))
-                                ->info()
-                                ->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()
-                                ->title('STK Push Failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
+                        Notification::make()
+                            ->title('STK Push Sent')
+                            ->body("Payment prompt sent to {$phone}. CheckoutRequestID: " . ($response['CheckoutRequestID'] ?? 'OK'))
+                            ->info()
+                            ->send();
+                    } catch (\Throwable $e) {
+                        Notification::make()
+                            ->title('STK Push Failed')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
                     }
                 }),
         ];

@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\Invoices\Actions;
 
 use App\Models\Invoice;
+use App\Models\MpesaTransaction;
 use App\Services\MpesaService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 
@@ -19,23 +19,14 @@ class PayMpesaAction
             ->color('success')
             ->visible(fn (Invoice $record): bool => $record->needs_approval)
             ->modalHeading(fn (Invoice $record): string => "M-Pesa Payment — Invoice #{$record->no}")
-            ->modalDescription('Initiate a live Lipa Na M-Pesa STK push or simulate a local callback transaction.')
-            ->modalSubmitActionLabel('Process Payment')
+            ->modalDescription('Initiate a live Lipa Na M-Pesa STK push to the customer\'s phone.')
+            ->modalSubmitActionLabel('Send STK Push')
             ->fillForm(fn (Invoice $record): array => [
                 'phone_number' => $record->customer?->phone ?? '',
                 'amount' => $record->total_after_discount,
                 'bill_ref_number' => 'INV-' . $record->no,
-                'mode' => 'simulate',
             ])
             ->form([
-                Radio::make('mode')
-                    ->label('Execution Mode')
-                    ->options([
-                        'simulate' => 'Local Simulation (Instant demo callback)',
-                        'stk_push' => 'Live STK Push (Daraja API mobile prompt)',
-                    ])
-                    ->default('simulate')
-                    ->required(),
                 TextInput::make('phone_number')
                     ->label('M-Pesa Phone Number')
                     ->placeholder('e.g. 0712345678 or 254712345678')
@@ -60,48 +51,49 @@ class PayMpesaAction
                 $phone = (string) $data['phone_number'];
                 $amount = (float) $data['amount'];
                 $ref = (string) $data['bill_ref_number'];
-                $mode = $data['mode'] ?? 'simulate';
 
-                if ($mode === 'simulate') {
-                    $customerName = $record->customer?->name ?? 'Customer';
-                    $nameParts = explode(' ', $customerName, 2);
-                    $firstName = $nameParts[0] ?? 'Customer';
-                    $lastName = $nameParts[1] ?? 'Demo';
+                try {
+                    $normalizedPhone = $mpesaService->normalizePhoneNumber($phone);
 
-                    $transaction = $mpesaService->simulatePayment(
+                    $transaction = MpesaTransaction::create([
+                        'status' => MpesaTransaction::STATUS_PENDING,
+                        'msisdn' => $normalizedPhone,
+                        'trans_amount' => number_format($amount, 2, '.', ''),
+                        'bill_ref_number' => $ref,
+                        'invoice_number' => $ref,
+                    ]);
+
+                    $response = $mpesaService->sendStkPush(
                         phone: $phone,
                         amount: $amount,
-                        billRef: $ref,
-                        firstName: $firstName,
-                        lastName: $lastName
+                        reference: $ref,
+                        description: "Invoice #{$record->no}"
                     );
 
-                    Notification::make()
-                        ->title('M-Pesa Payment Simulated')
-                        ->body("Transaction {$transaction->transaction_id} for KES " . number_format($amount, 2) . " successfully recorded for Invoice #{$record->no}.")
-                        ->success()
-                        ->send();
-                } else {
-                    try {
-                        $response = $mpesaService->sendStkPush(
-                            phone: $phone,
-                            amount: $amount,
-                            reference: $ref,
-                            description: "Invoice #{$record->no}"
-                        );
+                    $transaction->update([
+                        'checkout_request_id' => $response['CheckoutRequestID'] ?? null,
+                        'merchant_request_id' => $response['MerchantRequestID'] ?? null,
+                        'raw_payload' => json_encode($response),
+                    ]);
 
-                        Notification::make()
-                            ->title('STK Push Sent')
-                            ->body("Payment prompt sent to {$phone}. CheckoutRequestID: " . ($response['CheckoutRequestID'] ?? 'OK'))
-                            ->info()
-                            ->send();
-                    } catch (\Throwable $e) {
-                        Notification::make()
-                            ->title('STK Push Request Failed')
-                            ->body($e->getMessage())
-                            ->danger()
-                            ->send();
+                    Notification::make()
+                        ->title('STK Push Sent')
+                        ->body("Payment prompt sent to {$phone}. CheckoutRequestID: " . ($response['CheckoutRequestID'] ?? 'OK'))
+                        ->info()
+                        ->send();
+                } catch (\Throwable $e) {
+                    if (isset($transaction) && $transaction->exists) {
+                        $transaction->update([
+                            'status' => MpesaTransaction::STATUS_FAILED,
+                            'result_desc' => $e->getMessage(),
+                        ]);
                     }
+
+                    Notification::make()
+                        ->title('STK Push Request Failed')
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->send();
                 }
             });
     }
