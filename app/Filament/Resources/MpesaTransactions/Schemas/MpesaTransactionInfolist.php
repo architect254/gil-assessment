@@ -31,6 +31,11 @@ class MpesaTransactionInfolist
                                 MpesaTransaction::STATUS_CANCELLED => 'Cancelled',
                                 default => 'Pending',
                             }),
+                        TextEntry::make('payment_method')
+                            ->label('Channel')
+                            ->badge()
+                            ->color(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'info' : 'success')
+                            ->formatStateUsing(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'Express' : 'C2B'),
                         TextEntry::make('transaction_id')
                             ->label('Transaction ID')
                             ->badge()

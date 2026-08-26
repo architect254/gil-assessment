@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -41,6 +42,9 @@ class MpesaTransaction extends Model
     public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_TIMEOUT = 'timeout';
+
+    public const METHOD_C2B = 'c2b';
+    public const METHOD_STK = 'express';
 
     /**
      * Derive transaction status from M-Pesa ResultCode.
@@ -95,6 +99,16 @@ class MpesaTransaction extends Model
         return static::query()
             ->where('status', static::STATUS_SUCCESS)
             ->whereNull('mpesa_receipt_number');
+    }
+
+    /**
+     * Derive payment method from the transaction's characteristics.
+     * C2B: no checkout_request_id (direct Pay Bill callback)
+     * Express: has checkout_request_id (STK Push)
+     */
+    protected function paymentMethod(): Attribute
+    {
+        return Attribute::get(fn () => $this->checkout_request_id ? static::METHOD_STK : static::METHOD_C2B);
     }
 
     /**

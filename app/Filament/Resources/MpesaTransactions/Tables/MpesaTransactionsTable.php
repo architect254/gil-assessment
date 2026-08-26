@@ -34,6 +34,12 @@ class MpesaTransactionsTable
                     })
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('payment_method')
+                    ->label('Channel')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'info' : 'success')
+                    ->formatStateUsing(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'Express' : 'C2B')
+                    ->sortable(),
                 TextColumn::make('transaction_id')
                     ->label('Trans ID')
                     ->badge()

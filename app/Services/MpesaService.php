@@ -98,14 +98,14 @@ class MpesaService
         $normalizedPhone = $this->normalizePhoneNumber($phone);
         $token = $this->generateDarajaToken();
 
-        $shortcode = (string) config('mpesa.shortcode', '174379');
+        $shortcode = (string) config('mpesa.stk_shortcode', '174379');
         $passkey = (string) config('mpesa.passkey');
         if ($passkey === '') {
             throw new RuntimeException('MPESA_PASSKEY is not configured.');
         }
         $timestamp = now()->format('YmdHis');
         $password = base64_encode($shortcode . $passkey . $timestamp);
-        $callbackUrl = url('/api/mpesa/confirmation');
+        $callbackUrl = config('mpesa.stk_callback_url') ?? url('/api/c2b/confirmation');
 
         $url = $this->getBaseUrl() . '/mpesa/stkpush/v1/processrequest';
 
