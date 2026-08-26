@@ -94,6 +94,9 @@ class MpesaTransactionsTable
             ->toolbarActions([
                 //
             ])
-            ->defaultSort('id', 'desc');
+            ->defaultSort('id', 'desc')
+            ->poll(fn () => MpesaTransaction::where('status', MpesaTransaction::STATUS_PENDING)
+                ->where('created_at', '>', now()->subMinutes(15))
+                ->exists() ? '5s' : null);
     }
 }
