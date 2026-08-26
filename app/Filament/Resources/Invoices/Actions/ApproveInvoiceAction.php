@@ -14,13 +14,13 @@ class ApproveInvoiceAction
             ->label('Approve')
             ->icon('heroicon-o-check-circle')
             ->color('success')
-            ->visible(fn (Invoice $record): bool => ! $record->needs_approval)
+            ->visible(fn (Invoice $record): bool =>  $record->needs_approval)
             ->requiresConfirmation()
             ->modalHeading('Approve Invoice')
             ->modalDescription(fn (Invoice $record): string => "Are you sure you want to approve Invoice #{$record->no} for KES " . number_format((float) $record->total_after_discount, 2) . "?")
             ->modalSubmitActionLabel('Approve')
             ->action(function (Invoice $record): void {
-                $record->update(['needs_approval' => true]);
+                $record->update(['needs_approval' => false]);
 
                 Notification::make()
                     ->title('Invoice Approved')

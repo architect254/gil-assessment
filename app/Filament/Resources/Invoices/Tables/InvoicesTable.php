@@ -32,9 +32,9 @@ class InvoicesTable
                 TextColumn::make('needs_approval')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn (bool $state): string => $state ? 'APPROVED' : 'PENDING APPROVAL')
-                    ->color(fn (bool $state): string => $state ? 'success' : 'warning')
-                    ->icon(fn (bool $state): string => $state ? 'heroicon-m-check-circle' : 'heroicon-m-clock')
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'NEEDS APPROVAL' : 'APPROVED')
+                    ->color(fn (bool $state): string => $state ? 'warning' : 'success')
+                    ->icon(fn (bool $state): string => $state ? 'heroicon-m-clock' : 'heroicon-m-check-circle')
                     ->sortable(),
                 TextColumn::make('total_after_discount')
                     ->label('Total')

@@ -61,13 +61,13 @@ class InvoiceInfolist
                                     ->label('Status')
                                     ->badge()
                                     ->size('lg')
-                                    ->icon(fn (bool $state) => $state
+                                    ->icon(fn (bool $state) => !$state
                                         ? 'heroicon-o-check-circle'
                                         : 'heroicon-o-clock')
-                                    ->formatStateUsing(fn (bool $state): string => $state
+                                    ->formatStateUsing(fn (bool $state): string => !$state
                                         ? 'Approved'
                                         : 'Pending Approval')
-                                    ->color(fn (bool $state): string => $state
+                                    ->color(fn (bool $state): string => !$state
                                         ? 'success'
                                         : 'warning')
                                     ->columnSpan(1),

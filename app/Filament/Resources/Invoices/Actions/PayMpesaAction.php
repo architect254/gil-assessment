@@ -17,7 +17,7 @@ class PayMpesaAction
             ->label('Pay with M-Pesa')
             ->icon('heroicon-o-banknotes')
             ->color('success')
-            ->visible(fn (Invoice $record): bool => $record->needs_approval)
+            ->visible(fn (Invoice $record): bool => !$record->needs_approval)
             ->modalHeading(fn (Invoice $record): string => "M-Pesa Payment — Invoice #{$record->no}")
             ->modalDescription('Initiate a live Lipa Na M-Pesa STK push to the customer\'s phone.')
             ->modalSubmitActionLabel('Send STK Push')
