@@ -68,10 +68,12 @@ class MpesaCallbackController extends Controller
 
                 if ($existing) {
                     if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
-                        // Allowed transition: merge callback fields, exclude invoice_id/raised_at to prevent nullification
+                        // Allowed transition: merge non-null callback fields only — prevents STK failure/cancellation
+                        // callbacks (which carry no customer details) from nullifying msisdn, bill_ref, names, etc.
                         $existing->update(array_merge(
                             collect($transaction->getAttributes())
                                 ->except(['invoice_id', 'raised_at'])
+                                ->filter(fn ($v) => $v !== null)
                                 ->toArray(),
                             ['resolved_at' => now()],
                         ));
@@ -86,7 +88,7 @@ class MpesaCallbackController extends Controller
                             'middle_name',
                             'last_name',
                             'raw_payload',
-                        ]))->filter()->toArray());
+                        ]))->filter(fn ($v) => $v !== null)->toArray());
                     }
                 } else {
                     // No existing record — first time seeing this checkout_request_id
@@ -100,9 +102,11 @@ class MpesaCallbackController extends Controller
 
                 if ($existing) {
                     if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
+                        // Allowed transition: merge non-null callback fields only — same guard as STK branch
                         $existing->update(array_merge(
                             collect($transaction->getAttributes())
                                 ->except(['invoice_id', 'raised_at'])
+                                ->filter(fn ($v) => $v !== null)
                                 ->toArray(),
                             ['resolved_at' => now()],
                         ));

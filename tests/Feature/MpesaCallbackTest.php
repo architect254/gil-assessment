@@ -157,6 +157,8 @@ class MpesaCallbackTest extends TestCase
             'msisdn' => '254712345678',
             'trans_amount' => '1000.00',
             'bill_ref_number' => 'INV-1',
+            'first_name' => 'John',
+            'last_name' => 'Doe',
         ]);
 
         $payload = [
@@ -177,6 +179,11 @@ class MpesaCallbackTest extends TestCase
         $this->assertSame('1032', $pending->result_code);
         $this->assertSame('Request cancelled by user', $pending->result_desc);
         $this->assertSame('29115-34620561-1', $pending->merchant_request_id);
+        // Cancellation callback carries no customer details — filter() must preserve originals
+        $this->assertSame('254712345678', $pending->msisdn);
+        $this->assertSame('INV-1', $pending->bill_ref_number);
+        $this->assertSame('John', $pending->first_name);
+        $this->assertSame('Doe', $pending->last_name);
     }
 
     public function test_stk_push_success_updates_pending_record(): void
