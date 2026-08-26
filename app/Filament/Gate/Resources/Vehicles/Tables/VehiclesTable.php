@@ -3,7 +3,6 @@
 namespace App\Filament\Gate\Resources\Vehicles\Tables;
 
 use App\Models\Vehicle;
-use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
@@ -56,7 +55,7 @@ class VehiclesTable
                 EditAction::make(),
             ])
             ->toolbarActions([
-                CreateAction::make(),
+                //
             ])
             ->defaultSort('number');
     }

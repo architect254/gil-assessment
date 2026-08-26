@@ -2,7 +2,6 @@
 
 namespace App\Filament\Gate\Resources\Drivers\Tables;
 
-use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
@@ -41,7 +40,7 @@ class DriversTable
                 EditAction::make(),
             ])
             ->toolbarActions([
-                CreateAction::make(),
+                //
             ])
             ->defaultSort('name');
     }

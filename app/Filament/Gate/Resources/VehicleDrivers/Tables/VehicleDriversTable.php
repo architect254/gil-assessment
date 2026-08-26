@@ -2,7 +2,6 @@
 
 namespace App\Filament\Gate\Resources\VehicleDrivers\Tables;
 
-use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\IconColumn;
@@ -44,7 +43,7 @@ class VehicleDriversTable
                 EditAction::make(),
             ])
             ->toolbarActions([
-                CreateAction::make(),
+                //
             ])
             ->defaultSort('vehicle_id');
     }

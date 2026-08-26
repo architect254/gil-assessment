@@ -2,6 +2,8 @@
 
 namespace App\Filament\Gate\Resources\Vehicles;
 
+use App\Filament\Gate\Resources\Vehicles\Pages\CreateVehicle;
+use App\Filament\Gate\Resources\Vehicles\Pages\EditVehicle;
 use App\Filament\Gate\Resources\Vehicles\Pages\ListVehicles;
 use App\Filament\Gate\Resources\Vehicles\Tables\VehiclesTable;
 use App\Models\Vehicle;
@@ -47,6 +49,8 @@ class VehicleResource extends Resource
     {
         return [
             'index' => ListVehicles::route('/'),
+            'create' => CreateVehicle::route('/create'),
+            'edit' => EditVehicle::route('/{record}/edit'),
         ];
     }
 }

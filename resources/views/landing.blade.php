@@ -19,10 +19,6 @@
             <p class="text-xs text-slate-400">Laravel 13 & Filament Suite</p>
         </div>
     </div>
-    <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-full px-4 py-1.5 text-xs text-slate-400">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>SQL Server & M-Pesa Connected</span>
-    </div>
 </header>
 
 <!-- Main Content Grid -->
@@ -121,10 +117,6 @@
                     </li>
                     <li class="flex items-center space-x-2">
                         <span class="text-emerald-400">✓</span>
-                        <span>Gate-Out auto-populate for active vehicles</span>
-                    </li>
-                    <li class="flex items-center space-x-2">
-                        <span class="text-emerald-400">✓</span>
                         <span>Automatic timestamp & user context capture</span>
                     </li>
                 </ul>
@@ -136,24 +128,6 @@
             </div>
         </a>
 
-    </div>
-
-    <!-- Task 3 Integration Banner -->
-    <div class="mt-8 max-w-4xl mx-auto bg-slate-900/50 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex items-center space-x-4">
-            <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            </div>
-            <div>
-                <h4 class="text-sm font-semibold text-white">Task 3: M-Pesa C2B API Callback Handler</h4>
-                <p class="text-xs text-slate-400">REST Endpoint active at <code class="text-amber-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">/api/mpesa/c2b/callback</code></p>
-            </div>
-        </div>
-        <span class="text-xs font-mono bg-slate-950 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-800 shrink-0">
-                POST JSON Listener
-            </span>
     </div>
 </main>
 
