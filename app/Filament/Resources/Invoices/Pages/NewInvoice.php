@@ -132,100 +132,50 @@ class NewInvoice extends Page
             ->statePath('data');
     }
 
-    protected function customerCodeField(): TextInput
+    protected function customerCodeField(): Select
     {
-        return TextInput::make('customer_code')
+        return Select::make('customer_code')
             ->label('Customer Code')
-            ->required()
-            ->maxLength(20)
-            ->datalist(fn (): array => Customer::query()->orderBy('code')->pluck('code')->all())
-            ->autocomplete('off')
-            ->suffixAction(
-                Action::make('chooseCustomerByCode')
-                    ->iconButton()
-                    ->icon('heroicon-m-list-bullet')
-                    ->tooltip('Choose From List')
-                    ->modalHeading('Choose Customer From List')
-                    ->modalDescription('All customer records from the database.')
-                    ->form([$this->customerPickerSelect(codeFirst: true)])
-                    ->action(function (array $data, $livewire): void {
-                        $this->applyPickedCustomer($data, $livewire);
-                    }),
-            )
-            ->rule(
-                static fn (): \Closure => static function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (blank($value)) {
-                        return;
-                    }
-
-                    if (! Customer::query()->where('code', trim((string) $value))->exists()) {
-                        $fail("The customer code \"{$value}\" does not exist.");
-                    }
-                },
-            );
-    }
-
-    protected function customerNameField(): TextInput
-    {
-        return TextInput::make('customer_name')
-            ->label('Customer Name')
-            ->required()
-            ->maxLength(255)
-            ->datalist(fn (): array => Customer::query()->orderBy('name')->pluck('name')->all())
-            ->autocomplete('off')
-            ->suffixAction(
-                Action::make('chooseCustomerByName')
-                    ->iconButton()
-                    ->icon('heroicon-m-list-bullet')
-                    ->tooltip('Choose From List')
-                    ->modalHeading('Choose Customer From List')
-                    ->modalDescription('Customer records listed by name.')
-                    ->form([$this->customerPickerSelect(codeFirst: false)])
-                    ->action(function (array $data, $livewire): void {
-                        $this->applyPickedCustomer($data, $livewire);
-                    }),
-            )
-            ->rule(
-                static fn (): \Closure => static function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (blank($value)) {
-                        return;
-                    }
-
-                    if (! Customer::query()->where('name', trim((string) $value))->exists()) {
-                        $fail("The customer name \"{$value}\" does not exist.");
-                    }
-                },
-            );
-    }
-
-    protected function applyPickedCustomer(array $data, $livewire): void
-    {
-        if (! $customer = Customer::find($data['customer_id'] ?? null)) {
-            return;
-        }
-
-        data_set($livewire, 'data.customer_code', $customer->code);
-        data_set($livewire, 'data.customer_name', $customer->name);
-    }
-
-    protected function customerPickerSelect(bool $codeFirst): Select
-    {
-        return Select::make('customer_id')
-            ->label('Search customer')
             ->searchable()
             ->required()
-            ->options(function () use ($codeFirst): array {
-                return Customer::query()
-                    ->orderBy($codeFirst ? 'code' : 'name')
-                    ->get()
-                    ->mapWithKeys(fn (Customer $customer): array => [
-                        $customer->id => $codeFirst
-                            ? "[{$customer->code}] — {$customer->name}"
-                            : "{$customer->name} — [{$customer->code}]",
-                    ])
-                    ->all();
-            })
-            ->columnSpanFull();
+            ->placeholder('Choose a customer…')
+            ->options(fn (): array => Customer::query()
+                ->orderBy('code')
+                ->get()
+                ->mapWithKeys(fn (Customer $c): array => [
+                    $c->code => "{$c->code} — {$c->name}",
+                ])
+                ->all())
+            ->live(onBlur: true)
+            ->afterStateUpdated(function ($state, $set): void {
+                $customer = Customer::where('code', $state)->first();
+                if ($customer) {
+                    $set('customer_name', $customer->name);
+                }
+            });
+    }
+
+    protected function customerNameField(): Select
+    {
+        return Select::make('customer_name')
+            ->label('Customer Name')
+            ->searchable()
+            ->required()
+            ->placeholder('Choose a customer…')
+            ->options(fn (): array => Customer::query()
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(fn (Customer $c): array => [
+                    $c->name => $c->name,
+                ])
+                ->all())
+            ->live(onBlur: true)
+            ->afterStateUpdated(function ($state, $set): void {
+                $customer = Customer::where('name', $state)->first();
+                if ($customer) {
+                    $set('customer_code', $customer->code);
+                }
+            });
     }
 
     protected function needsApproval(): bool
@@ -299,95 +249,52 @@ class NewInvoice extends Page
             ->addActionLabel('Add Line Item');
     }
 
-    protected function lineItemCodeField(): TextInput
+    protected function lineItemCodeField(): Select
     {
-        return TextInput::make('item_code')
+        return Select::make('item_code')
             ->label('Item No.')
-            ->required()
-            ->maxLength(20)
-            ->datalist(fn (): array => Item::query()->orderBy('code')->pluck('code')->all())
-            ->autocomplete('off')
-            ->suffixAction(
-                Action::make('chooseLineItemByCode')
-                    ->iconButton()
-                    ->icon('heroicon-m-list-bullet')
-                    ->tooltip('Choose From List')
-                    ->modalHeading('Choose Item From List')
-                    ->modalDescription('All item records from the database.')
-                    ->form([$this->itemPickerSelect(descriptionFirst: false)])
-                    ->action(function (array $data, $livewire, $component): void {
-                        $this->applyPickedItem($data, $livewire, $component);
-                    }),
-            )
-            ->rule(
-                static fn (): \Closure => static function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (blank($value)) {
-                        return;
-                    }
-
-                    if (! Item::query()->where('code', trim((string) $value))->exists()) {
-                        $fail("The item \"{$value}\" does not exist. Create it under Items first.");
-                    }
-                },
-            );
-    }
-
-    protected function lineItemDescriptionField(): TextInput
-    {
-        return TextInput::make('item_description')
-            ->label('Item Description')
-            ->required()
-            ->maxLength(255)
-            ->datalist(fn (): array => Item::query()->orderBy('description')->pluck('description')->all())
-            ->autocomplete('off')
-            ->suffixAction(
-                Action::make('chooseLineItemByDescription')
-                    ->iconButton()
-                    ->icon('heroicon-m-list-bullet')
-                    ->tooltip('Choose From List')
-                    ->modalHeading('Choose Item From List')
-                    ->modalDescription('Item records listed by description.')
-                    ->form([$this->itemPickerSelect(descriptionFirst: true)])
-                    ->action(function (array $data, $livewire, $component): void {
-                        $this->applyPickedItem($data, $livewire, $component);
-                    }),
-            );
-    }
-
-    protected function applyPickedItem(array $data, $livewire, $component): void
-    {
-        if (! $item = Item::find($data['item_id'] ?? null)) {
-            return;
-        }
-
-        $fieldPath = (string) str($component->getStatePath())->beforeLast('.');
-        $quantity = (float) (data_get($livewire, "{$fieldPath}.quantity") ?? 0);
-        $discountPercent = min(max((float) (data_get($livewire, "{$fieldPath}.discount") ?? 0), 0), 100);
-        $priceAfter = round((float) $item->unit_price * (1 - ($discountPercent / 100)), 3);
-
-        data_set($livewire, "{$fieldPath}.item_code", $item->code);
-        data_set($livewire, "{$fieldPath}.item_description", $item->description);
-        data_set($livewire, "{$fieldPath}.price_before_discount", sprintf('%.3F', (float) $item->unit_price));
-    }
-
-    protected function itemPickerSelect(bool $descriptionFirst): Select
-    {
-        return Select::make('item_id')
-            ->label('Search item')
             ->searchable()
             ->required()
-            ->options(function () use ($descriptionFirst): array {
-                return Item::query()
-                    ->orderBy($descriptionFirst ? 'description' : 'code')
-                    ->get()
-                    ->mapWithKeys(fn (Item $item): array => [
-                        $item->id => $descriptionFirst
-                            ? "{$item->description} — [{$item->code}]"
-                            : "[{$item->code}] — {$item->description}",
-                    ])
-                    ->all();
-            })
-            ->columnSpanFull();
+            ->placeholder('Choose an item…')
+            ->options(fn (): array => Item::query()
+                ->orderBy('code')
+                ->get()
+                ->mapWithKeys(fn (Item $item): array => [
+                    $item->code => "{$item->code} — {$item->description}",
+                ])
+                ->all())
+            ->live(onBlur: true)
+            ->afterStateUpdated(function ($state, $set): void {
+                $item = Item::where('code', $state)->first();
+                if ($item) {
+                    $set('item_description', $item->description);
+                    $set('price_before_discount', sprintf('%.3F', (float) $item->unit_price));
+                }
+            });
+    }
+
+    protected function lineItemDescriptionField(): Select
+    {
+        return Select::make('item_description')
+            ->label('Item Description')
+            ->searchable()
+            ->required()
+            ->placeholder('Choose an item…')
+            ->options(fn (): array => Item::query()
+                ->orderBy('description')
+                ->get()
+                ->mapWithKeys(fn (Item $item): array => [
+                    $item->description => $item->description,
+                ])
+                ->all())
+            ->live(onBlur: true)
+            ->afterStateUpdated(function ($state, $set): void {
+                $item = Item::where('description', $state)->first();
+                if ($item) {
+                    $set('item_code', $item->code);
+                    $set('price_before_discount', sprintf('%.3F', (float) $item->unit_price));
+                }
+            });
     }
 
     protected function totalsSection(): Section
