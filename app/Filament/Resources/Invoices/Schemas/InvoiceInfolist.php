@@ -203,6 +203,7 @@ class InvoiceInfolist
                 Section::make('M-Pesa Payments')
                     ->icon('heroicon-o-banknotes')
                     ->columnSpanFull()
+                    ->poll('5s')
                     ->description(fn (?Invoice $record) => $record
                         ? app(MpesaService::class)->getTransactionsForInvoice($record)->count() . ' transaction(s) recorded'
                         : null)
