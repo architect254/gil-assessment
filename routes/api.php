@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\MpesaCallbackController;
 use Illuminate\Support\Facades\Route;
 
-// Safaricom Daraja C2B + STK Push callback endpoints (rate limited, no session auth – M-Pesa calls these directly)
+// Safaricom Daraja C2B callback endpoints (rate limited, no session auth – M-Pesa calls these directly)
 Route::middleware('throttle:60,1')->group(function () {
     Route::post('/c2b/validation', [MpesaCallbackController::class, 'validation'])
         ->name('c2b.validation');

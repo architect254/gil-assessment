@@ -67,48 +67,15 @@ class MpesaCallbackController extends Controller
         try {
             $transaction = MpesaTransaction::fromCallback($payload);
 
-            if (filled($transaction->checkout_request_id)) {
-                $existing = MpesaTransaction::query()
-                    ->where('checkout_request_id', $transaction->checkout_request_id)
-                    ->first();
-
-                if ($existing) {
-                    if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
-                        // Allowed transition: merge non-null callback fields only — prevents STK failure/cancellation
-                        // callbacks (which carry no customer details) from nullifying msisdn, bill_ref, names, etc.
-                        $existing->update(array_merge(
-                            collect($transaction->getAttributes())
-                                ->except(['invoice_id', 'raised_at'])
-                                ->filter(fn ($v) => $v !== null)
-                                ->toArray(),
-                            ['resolved_at' => now()],
-                        ));
-                    } else {
-                        // Late callback at already-settled transaction: backfill receipt + metadata only, no status change
-                        $existing->update(collect($transaction->only([
-                            'mpesa_receipt_number',
-                            'trans_time',
-                            'trans_amount',
-                            'org_account_balance',
-                            'first_name',
-                            'middle_name',
-                            'last_name',
-                            'raw_payload',
-                        ]))->filter(fn ($v) => $v !== null)->toArray());
-                    }
-                } else {
-                    // No existing record — first time seeing this checkout_request_id
-                    $transaction->resolved_at = now();
-                    $transaction->save();
-                }
-            } elseif (filled($transaction->transaction_id)) {
+            if (filled($transaction->transaction_id)) {
                 $existing = MpesaTransaction::query()
                     ->where('transaction_id', $transaction->transaction_id)
                     ->first();
 
                 if ($existing) {
                     if (MpesaTransaction::isTransitionAllowed($existing->status, $transaction->status)) {
-                        // Allowed transition: merge non-null callback fields only — same guard as STK branch
+                        // Allowed transition: merge non-null callback fields only — prevents C2B failure
+                        // callbacks (which carry no customer details) from nullifying msisdn, bill_ref, names, etc.
                         $existing->update(array_merge(
                             collect($transaction->getAttributes())
                                 ->except(['invoice_id', 'raised_at'])

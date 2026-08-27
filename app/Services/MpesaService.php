@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use App\Models\MpesaTransaction;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Http;
-use Exception;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -80,111 +79,6 @@ class MpesaService
                 throw $e;
             }
             throw new RuntimeException('Error connecting to Daraja API: ' . $e->getMessage(), 0, $e);
-        }
-    }
-
-    /**
-     * Initiate a Lipa Na M-Pesa STK Push request.
-     *
-     * @return array<string, mixed>
-     * @throws RuntimeException|InvalidArgumentException
-     */
-    public function sendStkPush(
-        string $phone,
-        float $amount,
-        string $reference = 'Payment',
-        string $description = 'Invoice Payment'
-    ): array {
-        $normalizedPhone = $this->normalizePhoneNumber($phone);
-        $token = $this->generateDarajaToken();
-
-        $shortcode = (string) config('mpesa.stk_shortcode', '174379');
-        $passkey = (string) config('mpesa.passkey');
-        if ($passkey === '') {
-            throw new RuntimeException('MPESA_PASSKEY is not configured.');
-        }
-        $timestamp = now()->format('YmdHis');
-        $password = base64_encode($shortcode . $passkey . $timestamp);
-        $callbackUrl = config('mpesa.stk_callback_url') ?? url('/api/c2b/confirmation');
-
-        $url = $this->getBaseUrl() . '/mpesa/stkpush/v1/processrequest';
-
-        $payload = [
-            'BusinessShortCode' => $shortcode,
-            'Password' => $password,
-            'Timestamp' => $timestamp,
-            'TransactionType' => 'CustomerPayBillOnline',
-            'Amount' => max(1, (int) round($amount)),
-            'PartyA' => $normalizedPhone,
-            'PartyB' => $shortcode,
-            'PhoneNumber' => $normalizedPhone,
-            'CallBackURL' => $callbackUrl,
-            'AccountReference' => substr($reference, 0, 12),
-            'TransactionDesc' => substr($description, 0, 13),
-        ];
-
-        try {
-            $response = Http::withToken($token)
-                ->timeout(10)
-                ->post($url, $payload);
-
-            if ($response->successful()) {
-                return $response->json() ?? [];
-            }
-
-            $errorMsg = $response->json('errorMessage') ?? $response->body();
-            throw new RuntimeException("STK Push failed ({$response->status()}): {$errorMsg}");
-        } catch (\Exception $e) {
-            if ($e instanceof RuntimeException) {
-                throw $e;
-            }
-            throw new RuntimeException('STK Push request error: ' . $e->getMessage(), 0, $e);
-        }
-    }
-
-    /**
-     * Query the status of an STK Push request via Daraja.
-     *
-     * @return array<string, mixed>
-     * @throws RuntimeException
-     */
-    public function queryStkPushStatus(string $checkoutRequestId): array
-    {
-        $token = $this->generateDarajaToken();
-
-        $shortcode = (string) config('mpesa.shortcode', '174379');
-        $passkey = (string) config('mpesa.passkey');
-        if ($passkey === '') {
-            throw new RuntimeException('MPESA_PASSKEY is not configured.');
-        }
-        $timestamp = now()->format('YmdHis');
-        $password = base64_encode($shortcode . $passkey . $timestamp);
-
-        $url = $this->getBaseUrl() . '/mpesa/stkpushquery/v1/query';
-
-        try {
-            $response = Http::withToken($token)
-                ->timeout(10)
-                ->post($url, [
-                    'BusinessShortCode' => $shortcode,
-                    'Password' => $password,
-                    'Timestamp' => $timestamp,
-                    'CheckoutRequestID' => $checkoutRequestId,
-                ]);
-
-            if ($response->successful()) {
-                return $response->json() ?? [];
-            }
-
-            throw new RuntimeException(
-                "STK Push query failed ({$response->status()}): " .
-                ($response->json('errorMessage') ?? $response->body())
-            );
-        } catch (\Exception $e) {
-            if ($e instanceof RuntimeException) {
-                throw $e;
-            }
-            throw new RuntimeException('STK Push query request error: ' . $e->getMessage(), 0, $e);
         }
     }
 

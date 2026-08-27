@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Invoices\Tables;
 
-use App\Filament\Resources\Invoices\Actions\PayMpesaAction;
 use App\Filament\Resources\Invoices\Actions\ApproveInvoiceAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -52,7 +51,6 @@ class InvoicesTable
             ])
             ->recordActions([
                 ViewAction::make(),
-                PayMpesaAction::make(),
                 ApproveInvoiceAction::make(),
             ])
             ->toolbarActions([

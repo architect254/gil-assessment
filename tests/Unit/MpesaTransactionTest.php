@@ -114,7 +114,7 @@ class MpesaTransactionTest extends TestCase
     {
         $this->assertSame(
             MpesaTransaction::STATUS_TIMEOUT,
-            MpesaTransaction::resolveStatus('1037', isStkCallback: true),
+            MpesaTransaction::resolveStatus('1037'),
         );
     }
 
@@ -142,19 +142,11 @@ class MpesaTransactionTest extends TestCase
         );
     }
 
-    public function test_resolve_status_null_stk_returns_pending(): void
-    {
-        $this->assertSame(
-            MpesaTransaction::STATUS_PENDING,
-            MpesaTransaction::resolveStatus(null, isStkCallback: true),
-        );
-    }
-
-    public function test_resolve_status_null_c2b_returns_success(): void
+    public function test_resolve_status_null_returns_success(): void
     {
         $this->assertSame(
             MpesaTransaction::STATUS_SUCCESS,
-            MpesaTransaction::resolveStatus(null, isStkCallback: false),
+            MpesaTransaction::resolveStatus(null),
         );
     }
 
@@ -188,31 +180,41 @@ class MpesaTransactionTest extends TestCase
     public function test_from_callback_extracts_mpesa_receipt_number(): void
     {
         $payload = [
-            'Body' => [
-                'stkCallback' => [
-                    'MerchantRequestID' => '29115-00001-1',
-                    'CheckoutRequestID' => 'ws_CO_UNIT_TEST',
-                    'ResultCode' => 0,
-                    'ResultDesc' => 'Success',
-                    'CallbackMetadata' => [
-                        'items' => [
-                            ['Name' => 'Amount', 'Value' => 1000.00],
-                            ['Name' => 'Msisdn', 'Value' => 254712345678],
-                            ['Name' => 'TransID', 'Value' => 'RKTQUNIT01'],
-                            ['Name' => 'MpesaReceiptNumber', 'Value' => 'RKTQUNIT01'],
-                        ],
-                    ],
-                ],
-            ],
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'RKTQUNIT01',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '1000.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-1',
+            'MSISDN' => '254712345678',
         ];
 
         $transaction = MpesaTransaction::fromCallback($payload);
 
         $this->assertSame('RKTQUNIT01', $transaction->mpesa_receipt_number);
+        $this->assertSame('RKTQUNIT01', $transaction->transaction_id);
         $this->assertSame(MpesaTransaction::STATUS_SUCCESS, $transaction->status);
     }
 
-    public function test_from_callback_receipt_null_when_not_in_payload(): void
+    public function test_from_callback_uses_explicit_receipt_when_present(): void
+    {
+        $payload = [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => 'RKTQUNIT02',
+            'MpesaReceiptNumber' => 'EXPLICIT_RCPT',
+            'TransTime' => '20260822143015',
+            'TransAmount' => '1000.00',
+            'BusinessShortCode' => '174379',
+            'BillRefNumber' => 'INV-1',
+            'MSISDN' => '254712345678',
+        ];
+
+        $transaction = MpesaTransaction::fromCallback($payload);
+
+        $this->assertSame('EXPLICIT_RCPT', $transaction->mpesa_receipt_number);
+    }
+
+    public function test_from_callback_receipt_falls_back_to_transid(): void
     {
         $payload = [
             'TransactionType' => 'Pay Bill',
@@ -228,6 +230,7 @@ class MpesaTransactionTest extends TestCase
 
         $transaction = MpesaTransaction::fromCallback($payload);
 
-        $this->assertNull($transaction->mpesa_receipt_number);
+        $this->assertSame('SBX_C2B_001', $transaction->mpesa_receipt_number);
+        $this->assertSame(MpesaTransaction::METHOD_C2B, $transaction->payment_method);
     }
 }

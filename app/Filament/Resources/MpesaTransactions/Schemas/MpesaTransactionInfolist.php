@@ -34,8 +34,8 @@ class MpesaTransactionInfolist
                         TextEntry::make('payment_method')
                             ->label('Channel')
                             ->badge()
-                            ->color(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'info' : 'success')
-                            ->formatStateUsing(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'Express' : 'C2B'),
+                            ->color('success')
+                            ->formatStateUsing(fn (string $state): string => strtoupper($state)),
                         TextEntry::make('transaction_id')
                             ->label('Transaction ID')
                             ->badge()
@@ -74,9 +74,8 @@ class MpesaTransactionInfolist
                     ]),
                 Section::make('Daraja API Response')
                     ->description(fn (?MpesaTransaction $record): string => match ($record?->status) {
-                        MpesaTransaction::STATUS_PENDING => 'STK push sent — awaiting customer action and Safaricom callback.',
                         MpesaTransaction::STATUS_SUCCESS => 'Transaction completed successfully.',
-                        MpesaTransaction::STATUS_CANCELLED => 'Customer cancelled the STK push prompt.',
+                        MpesaTransaction::STATUS_CANCELLED => 'Transaction was cancelled.',
                         MpesaTransaction::STATUS_FAILED => 'Transaction failed.',
                         default => '',
                     })
@@ -89,12 +88,6 @@ class MpesaTransactionInfolist
                             ->label('Result Description')
                             ->placeholder('—')
                             ->columnSpanFull(),
-                        TextEntry::make('checkout_request_id')
-                            ->label('Checkout Request ID')
-                            ->placeholder('—'),
-                        TextEntry::make('merchant_request_id')
-                            ->label('Merchant Request ID')
-                            ->placeholder('—'),
                     ]),
                 Section::make('Raw Daraja Webhook Payload')
                     ->columnSpanFull()

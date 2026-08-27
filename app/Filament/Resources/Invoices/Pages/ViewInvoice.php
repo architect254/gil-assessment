@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Invoices\Pages;
 
-use App\Filament\Resources\Invoices\Actions\PayMpesaAction;
 use App\Filament\Resources\Invoices\InvoiceResource;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -13,12 +12,5 @@ class ViewInvoice extends ViewRecord
     public function getTitle(): string
     {
         return 'Invoice '.($this->record->no ?? '');
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            PayMpesaAction::make(),
-        ];
     }
 }

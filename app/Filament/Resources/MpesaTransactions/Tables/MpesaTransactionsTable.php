@@ -37,8 +37,8 @@ class MpesaTransactionsTable
                 TextColumn::make('payment_method')
                     ->label('Channel')
                     ->badge()
-                    ->color(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'info' : 'success')
-                    ->formatStateUsing(fn (string $state): string => $state === MpesaTransaction::METHOD_STK ? 'Express' : 'C2B')
+                    ->color('success')
+                    ->formatStateUsing(fn (string $state): string => strtoupper($state))
                     ->sortable(),
                 TextColumn::make('transaction_id')
                     ->label('Trans ID')
@@ -100,9 +100,6 @@ class MpesaTransactionsTable
             ->toolbarActions([
                 //
             ])
-            ->defaultSort('id', 'desc')
-            ->poll(fn () => MpesaTransaction::where('status', MpesaTransaction::STATUS_PENDING)
-                ->where('created_at', '>', now()->subMinutes(15))
-                ->exists() ? '5s' : null);
+            ->defaultSort('id', 'desc');
     }
 }

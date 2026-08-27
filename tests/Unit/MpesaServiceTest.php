@@ -77,51 +77,6 @@ class MpesaServiceTest extends TestCase
         $this->service->generateDarajaToken();
     }
 
-    public function test_send_stk_push_dispatches_expected_payload(): void
-    {
-        config([
-            'mpesa.consumer_key' => 'test_key',
-            'mpesa.consumer_secret' => 'test_secret',
-            'mpesa.shortcode' => '174379',
-            'mpesa.passkey' => 'test_passkey',
-            'mpesa.environment' => 'sandbox',
-        ]);
-
-        Http::fake([
-            'https://sandbox.safaricom.co.ke/oauth/v1/generate*' => Http::response([
-                'access_token' => 'mocked_token',
-            ], 200),
-            'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest' => Http::response([
-                'MerchantRequestID' => '29115-34620561-1',
-                'CheckoutRequestID' => 'ws_CO_DMZ_12321_23423476',
-                'ResponseCode' => '0',
-                'ResponseDescription' => 'Success. Request accepted for processing',
-                'CustomerMessage' => 'Success. Request accepted for processing',
-            ], 200),
-        ]);
-
-        $response = $this->service->sendStkPush(
-            phone: '0712345678',
-            amount: 2500.50,
-            reference: 'INV-101',
-            description: 'Invoice 101'
-        );
-
-        $this->assertSame('0', $response['ResponseCode']);
-        $this->assertSame('ws_CO_DMZ_12321_23423476', $response['CheckoutRequestID']);
-
-        Http::assertSent(function ($request) {
-            if ($request->url() === 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest') {
-                $data = $request->data();
-                return $data['BusinessShortCode'] === '174379'
-                    && $data['PhoneNumber'] === '254712345678'
-                    && $data['Amount'] === 2501
-                    && $data['AccountReference'] === 'INV-101';
-            }
-            return true;
-        });
-    }
-
     public function test_find_invoice_for_reference_finds_by_raw_or_prefixed_number(): void
     {
         $customer = Customer::create([
@@ -162,7 +117,7 @@ class MpesaServiceTest extends TestCase
         ]);
 
         // Create transactions directly via C2B callback payload (the only way to create them now)
-        $this->postJson('/api/mpesa/confirmation', [
+        $this->postJson('/api/c2b/confirmation', [
             'TransactionType' => 'Pay Bill',
             'TransID' => 'TX1',
             'TransTime' => '20260822143015',
@@ -174,7 +129,7 @@ class MpesaServiceTest extends TestCase
             'LastName' => 'User',
         ]);
 
-        $this->postJson('/api/mpesa/confirmation', [
+        $this->postJson('/api/c2b/confirmation', [
             'TransactionType' => 'Pay Bill',
             'TransID' => 'TX2',
             'TransTime' => '20260822143015',
@@ -186,7 +141,7 @@ class MpesaServiceTest extends TestCase
             'LastName' => 'User',
         ]);
 
-        $this->postJson('/api/mpesa/confirmation', [
+        $this->postJson('/api/c2b/confirmation', [
             'TransactionType' => 'Pay Bill',
             'TransID' => 'TX3',
             'TransTime' => '20260822143015',
