@@ -14,7 +14,8 @@ class MpesaTransactionInfolist
         return $schema
             ->components([
                 Section::make('Transaction Overview')
-                    ->columns(4)
+                    ->columnSpanFull()
+                    ->columns(8)
                     ->schema([
                         TextEntry::make('status')
                             ->label('Status')
@@ -67,27 +68,11 @@ class MpesaTransactionInfolist
                             ->placeholder('—'),
                         TextEntry::make('trans_time')
                             ->label('Trans Time')
-                            ->placeholder('—'),
+                            ->placeholder('—')
+                            ->dateTime(),
                         TextEntry::make('created_at')
                             ->label('Received At')
                             ->dateTime(),
-                    ]),
-                Section::make('Daraja API Response')
-                    ->description(fn (?MpesaTransaction $record): string => match ($record?->status) {
-                        MpesaTransaction::STATUS_SUCCESS => 'Transaction completed successfully.',
-                        MpesaTransaction::STATUS_CANCELLED => 'Transaction was cancelled.',
-                        MpesaTransaction::STATUS_FAILED => 'Transaction failed.',
-                        default => '',
-                    })
-                    ->columns(3)
-                    ->schema([
-                        TextEntry::make('result_code')
-                            ->label('Result Code')
-                            ->placeholder('—'),
-                        TextEntry::make('result_desc')
-                            ->label('Result Description')
-                            ->placeholder('—')
-                            ->columnSpanFull(),
                     ]),
                 Section::make('Raw Daraja Webhook Payload')
                     ->columnSpanFull()
