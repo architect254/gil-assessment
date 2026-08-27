@@ -77,6 +77,7 @@ class GateEntriesTable
                 Action::make('registerExit')
                     ->label('Register Exit')
                     ->icon('heroicon-o-arrow-right-start-on-rectangle')
+                    ->color('danger')
                     ->visible(fn (GateLog $record): bool => $record->isOpen())
                     ->requiresConfirmation()
                     ->modalDescription(fn (GateLog $record): string => "Register exit for vehicle {$record->vehicle_number} ({$record->driver_name})?")

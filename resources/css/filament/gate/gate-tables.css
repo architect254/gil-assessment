@@ -1,0 +1,81 @@
+/* Mobile-responsive gate tables
+   Scoped styles for the gate panel's stacked-on-mobile tables.
+   Desktop (sm+) keeps the default Filament table untouched;
+   only on mobile does each record become a card. */
+@media (max-width: 639px) {
+    .fi-ta-table-stacked-on-mobile > tbody > tr {
+        display: block;
+        margin: 0.75rem 0.25rem;
+        border: 1px solid rgb(229 231 235 / 1);
+        border-radius: 0.75rem;
+        background: rgb(255 255 255 / 1);
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        overflow: hidden;
+    }
+
+    .dark .fi-ta-table-stacked-on-mobile > tbody > tr {
+        border-color: rgb(255 255 255 / 0.1);
+        background: rgb(255 255 255 / 0.04);
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    }
+
+    .fi-ta-table-stacked-on-mobile > tbody > tr + tr {
+        margin-top: 0.75rem;
+    }
+
+    /* Each field reads as a dl row: label on top, value below. */
+    .fi-ta-table-stacked-on-mobile .fi-ta-cell-label {
+        padding-top: 0.35rem;
+        font-size: 0.7rem;
+        line-height: 1.1rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: rgb(107 114 128 / 1);
+    }
+
+    .dark .fi-ta-table-stacked-on-mobile .fi-ta-cell-label {
+        color: rgb(156 163 175 / 1);
+    }
+
+    .fi-ta-table-stacked-on-mobile > tbody > tr > .fi-ta-cell {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-bottom: 0.35rem;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-cell-content {
+        padding-bottom: 0.15rem;
+    }
+
+    /* Differentiate the actions cell: a separated action bar at the bottom of the card. */
+    .fi-ta-table-stacked-on-mobile .fi-ta-cell:has(.fi-ta-actions) {
+        margin-top: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid rgb(229 231 235 / 1);
+        background: rgb(249 250 251 / 1);
+    }
+
+    .dark .fi-ta-table-stacked-on-mobile .fi-ta-cell:has(.fi-ta-actions) {
+        border-top-color: rgb(255 255 255 / 0.1);
+        background: rgb(255 255 255 / 0.03);
+    }
+
+    /* Register Exit: prominent full-width danger button in the mobile card.
+       ViewAction stays a secondary link. */
+    .fi-ta-table-stacked-on-mobile .fi-ta-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-actions .fi-btn {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-actions .fi-btn.fi-color-danger {
+        font-weight: 600;
+    }
+}
