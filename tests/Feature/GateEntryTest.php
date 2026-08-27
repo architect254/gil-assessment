@@ -7,7 +7,9 @@ use App\Models\GateLog;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleDriver;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class GateEntryTest extends TestCase
@@ -122,5 +124,87 @@ class GateEntryTest extends TestCase
             ->assertOk()
             ->assertSee('KCX 789C')
             ->assertSee('1');
+    }
+
+    public function test_gate_in_vehicle_dropdown_only_lists_assigned_vehicles(): void
+    {
+        $user = User::factory()->create();
+
+        $assigned = Vehicle::query()->create(['number' => 'KVA 111A', 'active' => true]);
+        $unassigned = Vehicle::query()->create(['number' => 'KVB 222B', 'active' => true]);
+        $driver = Driver::query()->create(['name' => 'Filtering Driver']);
+
+        VehicleDriver::query()->create([
+            'vehicle_id' => $assigned->id,
+            'driver_id' => $driver->id,
+            'active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('gate'));
+
+        Livewire::actingAs($user)
+            ->test(\App\Filament\Gate\Resources\GateEntries\Pages\CreateGateEntry::class)
+            ->assertFormFieldExists('vehicle_id')
+            ->assertFormSet(function (array $state) use ($assigned, $unassigned): bool {
+                $options = $state['vehicle_id']['options'] ?? [];
+
+                return array_key_exists($assigned->id, $options) && ! array_key_exists($unassigned->id, $options);
+            });
+    }
+
+    public function test_gate_in_driver_dropdown_only_lists_assigned_drivers(): void
+    {
+        $user = User::factory()->create();
+
+        $vehicle = Vehicle::query()->create(['number' => 'KVC 333C', 'active' => true]);
+        $assignedDriver = Driver::query()->create(['name' => 'Assigned Driver']);
+        $unassignedDriver = Driver::query()->create(['name' => 'Unassigned Driver']);
+
+        VehicleDriver::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $assignedDriver->id,
+            'active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('gate'));
+
+        Livewire::actingAs($user)
+            ->test(\App\Filament\Gate\Resources\GateEntries\Pages\CreateGateEntry::class)
+            ->assertFormFieldExists('driver_id')
+            ->assertFormSet(function (array $state) use ($assignedDriver, $unassignedDriver): bool {
+                $options = $state['driver_id']['options'] ?? [];
+
+                return array_key_exists($assignedDriver->id, $options) && ! array_key_exists($unassignedDriver->id, $options);
+            });
+    }
+
+    public function test_selecting_vehicle_autofills_driver_details(): void
+    {
+        $user = User::factory()->create();
+
+        $vehicle = Vehicle::query()->create(['number' => 'KVD 444D', 'active' => true]);
+        $driver = Driver::query()->create([
+            'name' => 'Autofill Driver',
+            'id_number' => '99887766',
+            'phone' => '+254799000888',
+        ]);
+
+        VehicleDriver::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'active' => true,
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('gate'));
+
+        Livewire::actingAs($user)
+            ->test(\App\Filament\Gate\Resources\GateEntries\Pages\CreateGateEntry::class)
+            ->set('data.vehicle_id', $vehicle->id)
+            ->assertFormSet([
+                'driver_id' => $driver->id,
+                'driver_name' => 'Autofill Driver',
+                'driver_id_number' => '99887766',
+                'driver_phone' => '+254799000888',
+            ]);
     }
 }
