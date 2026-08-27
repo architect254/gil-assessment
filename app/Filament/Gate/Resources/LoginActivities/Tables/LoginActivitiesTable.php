@@ -34,6 +34,7 @@ class LoginActivitiesTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->stackedOnMobile()
             ->defaultSort('logged_in_at', 'desc');
     }
 }
