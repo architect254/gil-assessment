@@ -133,13 +133,13 @@ class InvoiceInfolist
                                     ])
                                     ->table([
                                         TableColumn::make('#')->alignCenter()->width(50),
-                                        TableColumn::make('Item Code')->width(120),
+                                        TableColumn::make('Item Code')->width(200),
                                         TableColumn::make('Description'),
-                                        TableColumn::make('Qty')->alignEnd()->width(80),
-                                        TableColumn::make('Unit Price')->alignEnd()->width(120),
-                                        TableColumn::make('Disc. %')->alignEnd()->width(80),
-                                        TableColumn::make('Net Price')->alignEnd()->width(120),
-                                        TableColumn::make('Total')->alignEnd()->width(120),
+                                        TableColumn::make('Qty')->alignEnd()->width(120),
+                                        TableColumn::make('Unit Price')->alignEnd()->width(160),
+                                        TableColumn::make('Disc. %')->alignEnd()->width(120),
+                                        TableColumn::make('Net Price')->alignEnd()->width(160),
+                                        TableColumn::make('Total')->alignEnd()->width(160),
                                     ]),
                             ]),
 
