@@ -30,3 +30,8 @@ Artisan::command('mpesa:backfill-invoice-ids', function () {
 
     $this->info("Done: {$resolved} resolved, {$unresolved} unresolved.");
 })->purpose('Resolve invoice_id for existing M-Pesa transactions');
+
+Artisan::command('mpesa:register-c2b-urls', function () {
+    $result = app(MpesaService::class)->registerC2BUrls();
+    $this->info(json_encode($result, JSON_PRETTY_PRINT));
+})->purpose('Register C2B confirmation/validation URLs with Daraja');

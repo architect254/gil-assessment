@@ -83,6 +83,53 @@ class MpesaService
     }
 
     /**
+     * Register the C2B confirmation and validation URLs with Daraja.
+     *
+     * URLs are read from MPESA_CONFIRMATION_URL / MPESA_VALIDATION_URL.
+     * Must be called once before simulated/live payments will reach the app.
+     *
+     * @throws RuntimeException
+     */
+    public function registerC2BUrls(): array
+    {
+        $shortcode = config('mpesa.shortcode', '');
+        $confirmationUrl = config('mpesa.confirmation_url', '');
+        $validationUrl = config('mpesa.validation_url', '');
+
+        if (blank($shortcode)) {
+            throw new RuntimeException('M-Pesa shortcode is not configured. Please set MPESA_SHORTCODE.');
+        }
+
+        if (blank($confirmationUrl) || blank($validationUrl)) {
+            throw new RuntimeException('C2B callback URLs are not configured. Please set MPESA_CONFIRMATION_URL and MPESA_VALIDATION_URL.');
+        }
+
+        $url = $this->getBaseUrl() . '/mpesa/c2b/v2/registerurl';
+
+        try {
+            $response = Http::withToken($this->generateDarajaToken())
+                ->timeout(10)
+                ->post($url, [
+                    'ShortCode' => (string) $shortcode,
+                    'ResponseType' => 'Completed',
+                    'ConfirmationURL' => $confirmationUrl,
+                    'ValidationURL' => $validationUrl,
+                ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            throw new RuntimeException('Failed to register C2B URLs: ' . $response->body());
+        } catch (\Exception $e) {
+            if ($e instanceof RuntimeException) {
+                throw $e;
+            }
+            throw new RuntimeException('Error registering C2B URLs with Daraja: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
      * Find an invoice matching a bill reference number (e.g., "INV-1" or "1").
      */
     public function findInvoiceForReference(?string $reference): ?Invoice

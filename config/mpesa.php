@@ -26,4 +26,12 @@ return [
     */
     'callback_secret' => env('MPESA_CALLBACK_SECRET'),
 
+    /*
+    | Publicly reachable C2B callback URLs registered with Daraja via the
+    | mpesa:register-c2b-urls command. These must be HTTPS in production.
+    */
+    'confirmation_url' => env('MPESA_CONFIRMATION_URL'),
+
+    'validation_url' => env('MPESA_VALIDATION_URL'),
+
 ];
