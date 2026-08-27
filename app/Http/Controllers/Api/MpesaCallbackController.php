@@ -58,6 +58,12 @@ class MpesaCallbackController extends Controller
 
         $payload = $request->all();
 
+        Log::info('M-Pesa callback received', [
+            'path' => $request->path(),
+            'route' => $request->route()?->getName(),
+            'payload' => $payload,
+        ]);
+
         try {
             $transaction = MpesaTransaction::fromCallback($payload);
 
