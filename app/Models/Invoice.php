@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MpesaService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\DB;
     'discount',
     'total_after_discount',
     'needs_approval',
+    'status',
     'created_by',
 ])]
 class Invoice extends Model
@@ -26,6 +28,10 @@ class Invoice extends Model
     use HasFactory;
 
     public const APPROVAL_THRESHOLD = 10000;
+
+    public const STATUS_UNPAID = 'unpaid';
+    public const STATUS_PARTIALLY_PAID = 'partially_paid';
+    public const STATUS_PAID = 'paid';
 
     protected function casts(): array
     {
@@ -35,7 +41,40 @@ class Invoice extends Model
             'discount' => 'decimal:3',
             'total_after_discount' => 'decimal:3',
             'needs_approval' => 'boolean',
+            'status' => 'string',
         ];
+    }
+
+    /**
+     * Recompute the invoice payment status from its settled M-Pesa transactions.
+     *
+     * Paid when the sum of successful transactions equals or exceeds the total,
+     * partially paid when a positive amount less than the total has been received,
+     * unpaid otherwise.
+     */
+    public function recomputePaymentStatus(): string
+    {
+        $total = (float) $this->total_after_discount;
+        $paid = (float) app(MpesaService::class)->settledAmountForInvoice($this);
+
+        $status = $paid >= $total
+            ? static::STATUS_PAID
+            : ($paid > 0 ? static::STATUS_PARTIALLY_PAID : static::STATUS_UNPAID);
+
+        $this->update(['status' => $status]);
+
+        return $status;
+    }
+
+    /**
+     * Whether this invoice is fully paid.
+     */
+    public function isPaid(): bool
+    {
+        $total = (float) $this->total_after_discount;
+        $paid = (float) app(MpesaService::class)->settledAmountForInvoice($this);
+
+        return $paid >= $total;
     }
 
     public function customer(): BelongsTo

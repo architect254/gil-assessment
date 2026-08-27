@@ -4,48 +4,53 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MpesaTransaction;
+use App\Services\MpesaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class MpesaCallbackController extends Controller
 {
+    /**
+     * Validate a C2B payment before the money moves.
+     *
+     * Read-only: no transaction record is written here. The purpose is to
+     * accept or reject a payment based on the referenced invoice before
+     * Safaricom lets the transaction proceed. Only fires when External
+     * Validation is enabled on the shortcode (disabled by default).
+     */
     public function validation(Request $request): JsonResponse
     {
-        return $this->handle($request);
-    }
+        $payload = $request->all();
 
-    public function confirmation(Request $request): JsonResponse
-    {
-        return $this->handle($request);
+        Log::info('M-Pesa validation received', [
+            'path' => $request->path(),
+            'route' => $request->route()?->getName(),
+            'payload' => $payload,
+        ]);
+
+        $invoice = app(MpesaService::class)
+            ->findInvoiceForReference((string) ($payload['BillRefNumber'] ?? ''));
+
+        if (! $invoice) {
+            return $this->validationResponse('C2B00012', 'Rejected');
+        }
+
+        $amount = (float) ($payload['TransAmount'] ?? 0);
+        $total = (float) $invoice->total_after_discount;
+
+        if ($amount > $total) {
+            return $this->validationResponse('C2B00013', 'Rejected');
+        }
+
+        return $this->validationResponse('0', 'Accepted');
     }
 
     /**
-     * Look up a stored C2B transaction by its M-Pesa transaction id.
+     * Persist a C2B confirmation callback (the authoritative "payment happened"
+     * signal) and update the linked invoice's payment status.
      */
-    public function show(string $transactionId): JsonResponse
-    {
-        $transaction = MpesaTransaction::query()
-            ->where('transaction_id', $transactionId)
-            ->firstOrFail();
-
-        return response()->json([
-            'data' => [
-                'transaction_id' => $transaction->transaction_id,
-                'status' => $transaction->status,
-                'result_code' => $transaction->result_code,
-                'result_desc' => $transaction->result_desc,
-                'amount' => $transaction->trans_amount,
-                'bill_ref_number' => $transaction->bill_ref_number,
-                'msisdn' => $transaction->msisdn,
-                'customer' => trim(($transaction->first_name ?? '').' '.($transaction->last_name ?? '')),
-                'trans_time' => $transaction->trans_time,
-                'received_at' => $transaction->created_at?->toIso8601String(),
-            ],
-        ]);
-    }
-
-    private function handle(Request $request): JsonResponse
+    public function confirmation(Request $request): JsonResponse
     {
         $secret = config('mpesa.callback_secret');
 
@@ -93,6 +98,8 @@ class MpesaCallbackController extends Controller
                     $transaction->resolved_at = now();
                     $transaction->save();
                 }
+
+                $this->linkInvoiceAndRecompute($payload);
             } else {
                 $transaction->save();
             }
@@ -113,6 +120,60 @@ class MpesaCallbackController extends Controller
         return response()->json([
             'ResultCode' => 0,
             'ResultDesc' => 'Accepted',
+        ]);
+    }
+
+    /**
+     * Look up a stored C2B transaction by its M-Pesa transaction id.
+     */
+    public function show(string $transactionId): JsonResponse
+    {
+        $transaction = MpesaTransaction::query()
+            ->where('transaction_id', $transactionId)
+            ->firstOrFail();
+
+        return response()->json([
+            'data' => [
+                'transaction_id' => $transaction->transaction_id,
+                'status' => $transaction->status,
+                'result_code' => $transaction->result_code,
+                'result_desc' => $transaction->result_desc,
+                'amount' => $transaction->trans_amount,
+                'bill_ref_number' => $transaction->bill_ref_number,
+                'msisdn' => $transaction->msisdn,
+                'customer' => trim(($transaction->first_name ?? '').' '.($transaction->last_name ?? '')),
+                'trans_time' => $transaction->trans_time,
+                'received_at' => $transaction->created_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Link the confirmation to its invoice (when resolvable) and refresh the
+     * invoice's payment status based on all settled transactions.
+     */
+    private function linkInvoiceAndRecompute(array $payload): void
+    {
+        $invoice = app(MpesaService::class)
+            ->findInvoiceForReference((string) ($payload['BillRefNumber'] ?? ''));
+
+        if (! $invoice) {
+            return;
+        }
+
+        MpesaTransaction::query()
+            ->where('transaction_id', $payload['TransID'] ?? $payload['TransactionID'] ?? null)
+            ->whereNull('invoice_id')
+            ->update(['invoice_id' => $invoice->id]);
+
+        $invoice->recomputePaymentStatus();
+    }
+
+    private function validationResponse(string $resultCode, string $resultDesc): JsonResponse
+    {
+        return response()->json([
+            'ResultCode' => $resultCode,
+            'ResultDesc' => $resultDesc,
         ]);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\MpesaTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -46,15 +48,72 @@ class MpesaCallbackTest extends TestCase
         ]);
     }
 
-    public function test_validation_endpoint_accepts_transaction(): void
+    public function test_validation_endpoint_accepts_transaction_within_invoice_total(): void
     {
-        $response = $this->postJson('/api/c2b/validation', $this->payload('VAL001'));
-
-        $response->assertOk()->assertJsonPath('ResultCode', 0);
-        $this->assertDatabaseHas('mpesa_transactions', [
-            'transaction_id' => 'VAL001',
-            'status' => MpesaTransaction::STATUS_SUCCESS,
+        $customer = Customer::create(['code' => 'CUST001', 'name' => 'Acme Corp']);
+        $invoice = Invoice::createWithNextNumber([
+            'customer_id' => $customer->id,
+            'posting_date' => now()->toDateString(),
+            'total_after_discount' => 2000.000,
         ]);
+
+        $payload = $this->payload('VAL001');
+        $payload['BillRefNumber'] = 'INV-' . $invoice->no;
+        $payload['TransAmount'] = '1500.00';
+
+        $response = $this->postJson('/api/c2b/validation', $payload);
+
+        $response->assertOk()->assertJsonPath('ResultCode', '0');
+        $response->assertJsonPath('ResultDesc', 'Accepted');
+    }
+
+    public function test_validation_does_not_create_transaction_record(): void
+    {
+        $customer = Customer::create(['code' => 'CUST001', 'name' => 'Acme Corp']);
+        $invoice = Invoice::createWithNextNumber([
+            'customer_id' => $customer->id,
+            'posting_date' => now()->toDateString(),
+            'total_after_discount' => 2000.000,
+        ]);
+
+        $payload = $this->payload('VAL002');
+        $payload['BillRefNumber'] = 'INV-' . $invoice->no;
+        $payload['TransAmount'] = '1000.00';
+
+        $this->postJson('/api/c2b/validation', $payload)->assertOk();
+
+        $this->assertSame(0, MpesaTransaction::count());
+    }
+
+    public function test_validation_rejects_unknown_invoice(): void
+    {
+        $payload = $this->payload('VAL003');
+        $payload['BillRefNumber'] = 'INV-NONEXISTENT';
+        $payload['TransAmount'] = '1000.00';
+
+        $response = $this->postJson('/api/c2b/validation', $payload);
+
+        $response->assertOk()->assertJsonPath('ResultCode', 'C2B00012');
+        $this->assertSame(0, MpesaTransaction::count());
+    }
+
+    public function test_validation_rejects_amount_above_invoice_total(): void
+    {
+        $customer = Customer::create(['code' => 'CUST001', 'name' => 'Acme Corp']);
+        $invoice = Invoice::createWithNextNumber([
+            'customer_id' => $customer->id,
+            'posting_date' => now()->toDateString(),
+            'total_after_discount' => 1000.000,
+        ]);
+
+        $payload = $this->payload('VAL004');
+        $payload['BillRefNumber'] = 'INV-' . $invoice->no;
+        $payload['TransAmount'] = '1500.00';
+
+        $response = $this->postJson('/api/c2b/validation', $payload);
+
+        $response->assertOk()->assertJsonPath('ResultCode', 'C2B00013');
+        $this->assertSame(0, MpesaTransaction::count());
     }
 
     public function test_duplicate_callbacks_are_idempotent(): void

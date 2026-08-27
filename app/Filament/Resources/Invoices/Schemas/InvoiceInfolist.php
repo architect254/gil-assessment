@@ -208,6 +208,19 @@ class InvoiceInfolist
                         : null)
                     ->collapsible()
                     ->schema([
+                        TextEntry::make('status')
+                            ->label('Payment Status')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                Invoice::STATUS_PAID => 'PAID',
+                                Invoice::STATUS_PARTIALLY_PAID => 'PARTIALLY PAID',
+                                default => 'UNPAID',
+                            })
+                            ->color(fn (string $state): string => match ($state) {
+                                Invoice::STATUS_PAID => 'success',
+                                Invoice::STATUS_PARTIALLY_PAID => 'warning',
+                                default => 'gray',
+                            }),
                         RepeatableEntry::make('mpesa_transactions')
                             ->hiddenLabel()
                             ->state(fn (?Invoice $record) => $record

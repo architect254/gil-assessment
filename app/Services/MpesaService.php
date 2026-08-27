@@ -167,4 +167,14 @@ class MpesaService
             ->latest('id')
             ->get();
     }
+
+    /**
+     * Total amount settled for an invoice from its successful M-Pesa transactions.
+     */
+    public function settledAmountForInvoice(Invoice|int $invoice): float
+    {
+        return (float) $this->getTransactionsForInvoice($invoice)
+            ->where('status', MpesaTransaction::STATUS_SUCCESS)
+            ->sum(fn (MpesaTransaction $tx) => (float) $tx->trans_amount);
+    }
 }

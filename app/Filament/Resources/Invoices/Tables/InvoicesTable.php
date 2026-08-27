@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Invoices\Tables;
 
 use App\Filament\Resources\Invoices\Actions\ApproveInvoiceAction;
+use App\Models\Invoice;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -34,6 +35,20 @@ class InvoicesTable
                     ->formatStateUsing(fn (bool $state): string => $state ? 'NEEDS APPROVAL' : 'APPROVED')
                     ->color(fn (bool $state): string => $state ? 'warning' : 'success')
                     ->icon(fn (bool $state): string => $state ? 'heroicon-m-clock' : 'heroicon-m-check-circle')
+                    ->sortable(),
+                TextColumn::make('status')
+                    ->label('Payment')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        Invoice::STATUS_PAID => 'PAID',
+                        Invoice::STATUS_PARTIALLY_PAID => 'PARTIALLY PAID',
+                        default => 'UNPAID',
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        Invoice::STATUS_PAID => 'success',
+                        Invoice::STATUS_PARTIALLY_PAID => 'warning',
+                        default => 'gray',
+                    })
                     ->sortable(),
                 TextColumn::make('total_after_discount')
                     ->label('Total')
