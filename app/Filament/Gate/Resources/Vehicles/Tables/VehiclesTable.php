@@ -36,11 +36,6 @@ class VehiclesTable
                     ->state(fn (Vehicle $record): string => $record->gateLogs()->where('status', 'in')->exists() ? 'On Premises' : 'Outside')
                     ->badge()
                     ->color(fn (string $state): string => $state === 'On Premises' ? 'warning' : 'gray'),
-                TextColumn::make('visits_count')
-                    ->counts('gateLogs')
-                    ->label('Total Visits')
-                    ->alignEnd()
-                    ->sortable(),
             ])
             ->stackedOnMobile()
             ->filters([

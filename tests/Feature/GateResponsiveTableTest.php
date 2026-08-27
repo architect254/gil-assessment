@@ -124,7 +124,6 @@ class GateResponsiveTableTest extends TestCase
             ->assertTableColumnExists('description')
             ->assertTableColumnExists('currentAssignment.driver.name')
             ->assertTableColumnExists('status')
-            ->assertTableColumnExists('visits_count')
             ->filterTable('on_premises', true)
             ->assertCanSeeTableRecords([$vehicle1])
             ->assertCanNotSeeTableRecords([$vehicle2]);
