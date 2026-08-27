@@ -16,12 +16,14 @@ use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form as FormComponent;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
@@ -43,7 +45,13 @@ class NewInvoice extends Page
     {
         $this->form->fill([
             'posting_date' => now()->toDateString(),
-            'lines' => [],
+            'lines' => [
+                [
+                    'quantity' => 0,
+                    'price_before_discount' => 0,
+                    'discount' => 0,
+                ],
+            ],
         ]);
     }
 
@@ -100,28 +108,31 @@ class NewInvoice extends Page
     {
         return $schema
             ->components([
-                Section::make()
+                Group::make()
                     ->schema([
                         Grid::make(4)
                             ->schema([
-                                $this->customerCodeField(),
-                                $this->customerNameField(),
-                                TextInput::make('document_no')
-                                    ->label('No.')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->default((string) Invoice::nextNumber())
-                                    ->maxLength(20),
-                                DatePicker::make('posting_date')
-                                    ->label('Posting Date')
-                                    ->required()
-                                    ->native(false)
-                                    ->displayFormat('d/m/Y'),
+                                Section::make('Customer')
+                                    ->schema([$this->customerCodeField(),
+                                        $this->customerNameField()])->columnSpan(1),
+                                            Group::make()->columnSpan(2),
+                                            Section::make('Invoice')
+                                                ->schema([TextInput::make('document_no')
+                                                    ->label('No.')
+                                                    ->disabled()
+                                                    ->dehydrated(false)
+                                                    ->default((string) Invoice::nextNumber())
+                                                    ->maxLength(20),
+                                                    DatePicker::make('posting_date')
+                                                        ->label('Posting Date')
+                                                        ->required()
+                                                        ->native(false)
+                                                        ->displayFormat('d/m/Y')])->columnSpan(1)
                             ]),
-                        Placeholder::make('approval_notice')
+                        TextEntry::make('approval_notice')
                             ->label('')
                             ->hidden(fn (): bool => ! $this->needsApproval())
-                            ->content(fn (): string => 'Invoice will go for approval – Amount: '
+                            ->state(fn (): string => 'Invoice will go for approval – Amount: '
                                 .number_format($this->totals()['after'], 3))
                             ->badge()
                             ->color('warning'),
@@ -228,16 +239,18 @@ class NewInvoice extends Page
                     ->validationMessages([
                         'lte' => sprintf('Discount cannot be greater than %s.', InvoiceLine::MAX_DISCOUNT),
                     ]),
-                Placeholder::make('price_after_discount_display')
+                TextEntry::make('price_after_discount_display')
                     ->hiddenLabel()
-                    ->content(fn ($get): string => number_format(
+                    ->alignEnd()
+                    ->state(fn ($get): string => number_format(
                         (float) ($get('price_before_discount') ?? 0)
                             * (1 - (min(max((float) ($get('discount') ?? 0), 0), 100) / 100)),
                         3,
                     )),
-                Placeholder::make('line_total_display')
+                TextEntry::make('line_total_display')
                     ->hiddenLabel()
-                    ->content(fn ($get): string => number_format(
+                    ->alignEnd()
+                    ->state(fn ($get): string => number_format(
                         (float) ($get('quantity') ?? 0)
                             * ((float) ($get('price_before_discount') ?? 0)
                                 * (1 - (min(max((float) ($get('discount') ?? 0), 0), 100) / 100))),
