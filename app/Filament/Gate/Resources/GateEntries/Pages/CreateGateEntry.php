@@ -41,6 +41,7 @@ class CreateGateEntry extends CreateRecord
         return GateLog::create([
             'vehicle_id' => $vehicle->id,
             'vehicle_number' => $vehicle->number,
+            'driver_id' => $data['driver_id'] ?? null,
             'driver_name' => $data['driver_name'],
             'driver_id_number' => $data['driver_id_number'] ?? null,
             'driver_phone' => $data['driver_phone'] ?? null,

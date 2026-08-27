@@ -4,7 +4,9 @@ namespace App\Filament\Gate\Resources\GateEntries;
 
 use App\Filament\Gate\Resources\GateEntries\Pages\CreateGateEntry;
 use App\Filament\Gate\Resources\GateEntries\Pages\ListGateEntries;
+use App\Filament\Gate\Resources\GateEntries\Pages\ViewGateEntry;
 use App\Filament\Gate\Resources\GateEntries\Schemas\GateEntryForm;
+use App\Filament\Gate\Resources\GateEntries\Schemas\GateEntryInfolist;
 use App\Filament\Gate\Resources\GateEntries\Tables\GateEntriesTable;
 use App\Models\GateLog;
 use BackedEnum;
@@ -26,6 +28,11 @@ class GateEntryResource extends Resource
         return GateEntryForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return GateEntryInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return GateEntriesTable::configure($table);
@@ -36,6 +43,7 @@ class GateEntryResource extends Resource
         return [
             'index' => ListGateEntries::route('/'),
             'create' => CreateGateEntry::route('/create'),
+            'view' => ViewGateEntry::route('/{record}'),
         ];
     }
 }

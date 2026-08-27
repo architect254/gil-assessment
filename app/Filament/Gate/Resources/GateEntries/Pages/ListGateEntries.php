@@ -2,7 +2,6 @@
 
 namespace App\Filament\Gate\Resources\GateEntries\Pages;
 
-use App\Filament\Gate\Pages\GateOut;
 use App\Filament\Gate\Resources\GateEntries\GateEntryResource;
 use App\Models\GateLog;
 use Filament\Actions\Action;

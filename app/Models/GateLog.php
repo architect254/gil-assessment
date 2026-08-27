@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'vehicle_id',
     'vehicle_number',
+    'driver_id',
     'driver_name',
     'driver_id_number',
     'driver_phone',
@@ -39,6 +40,11 @@ class GateLog extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 
     public function gatedInUser(): BelongsTo
