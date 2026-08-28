@@ -1,3 +1,22 @@
+@import 'tailwindcss';
+
+/* Filament toggles light/dark/system via a `dark` class on <html>, not a
+   media query. Make Tailwind's `dark:` variant follow that class so the
+   card utilities respond to the selected theme (mirrors Filament's own
+   index.css). */
+@variant dark (&:where(.dark, .dark *));
+
+@source '../../../views/livewire/gate/*.blade.php';
+@source '../../../../app/Filament/Gate/**/*.php';
+
+/* Hide the Filament card list on desktop (sm+) — the infinite-scroll
+   cards below are the mobile-only list and carry `sm:hidden`. */
+@media (min-width: 640px) {
+    .fi-resource-list-records-page .sm\:hidden {
+        display: none;
+    }
+}
+
 /* Mobile-responsive gate tables
    Scoped styles for the gate panel's stacked-on-mobile tables.
    Desktop (sm+) keeps the default Filament table untouched;
@@ -77,5 +96,12 @@
 
     .fi-ta-table-stacked-on-mobile .fi-ta-actions .fi-btn.fi-color-danger {
         font-weight: 600;
+    }
+
+    /* On mobile, replace the Filament table + its pagination with the
+       Livewire infinite-scroll card list. `.fi-ta` is the table container
+       that wraps the content, header, filters and pagination. */
+    .fi-resource-list-records-page .fi-ta {
+        display: none;
     }
 }
